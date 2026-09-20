@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Anglerfish</string>
+    <string name="vpn_notification_channel_name">Blocking active</string>
+    <string name="vpn_notification_title">Anglerfish is blocking internet access</string>
+    <string name="vpn_notification_text">Tap to manage which apps are blocked</string>
+    <string name="vpn_notification_deactivate">Deactivate</string>
+    <string name="activate_empty_selection">Select at least one app before activating</string>
+    <string name="activate_failed">Couldn\'t start blocking — check the VPN permission and try again</string>
+</resources>
