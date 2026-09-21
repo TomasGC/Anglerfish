@@ -134,13 +134,15 @@ class AppListViewModelTest {
     fun `toggling a selection while active restarts the vpn with the new set`() = runTest(dispatcher) {
         val repository = FakeAppRepository()
         val gateway = FakeVpnGateway()
-        val viewModel = AppListViewModel(repository, gateway, installedApps)
+        val twoApps = listOf(InstalledApp("com.example.one", "One"), InstalledApp("com.example.two", "Two"))
+        val viewModel = AppListViewModel(repository, gateway, twoApps)
+        repository.toggleSelection("com.example.one")
         repository.setActive(true)
 
-        viewModel.toggleApp("com.example.one")
+        viewModel.toggleApp("com.example.two")
         dispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(setOf("com.example.one"), gateway.startedWith)
+        assertEquals(setOf("com.example.one", "com.example.two"), gateway.startedWith)
     }
 
     @Test
