@@ -1,10 +1,10 @@
 # Tests - Anglerfish
 
-**Last Updated**: 2026-09-18
+**Last Updated**: 2026-09-21
 
 ---
 
-## Counts (target, per the implementation plan)
+## Counts (verified via `./gradlew testDebugUnitTest`, JUnit XML reports)
 
 | Category | Tests | Runner | Description |
 |----------|-------|--------|--------------|

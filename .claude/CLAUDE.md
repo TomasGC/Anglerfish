@@ -1,7 +1,7 @@
 # Project Instructions - Anglerfish
 
 **Purpose**: Android per-app internet blocker instructions
-**Last Updated**: 2026-09-18
+**Last Updated**: 2026-09-21
 
 ---
 
@@ -207,7 +207,7 @@ Anglerfish/
 - `.claude/sessions/plans/*.md` - Implementation plans from writing-plans/SDD
 
 **Public Documentation** (committed to git):
-- `README.md` - not yet written
+- `README.md` - public project overview, build instructions
 - `docs/manual-testing.md` - on-device VpnService checklist
 - GitHub Wiki - product requirements, architecture, conventions (mirrors this
   `.claude/contexts/` set at a summary level)
