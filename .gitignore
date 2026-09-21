@@ -1,4 +1,5 @@
 .worktrees/
+.claude/sessions/
 *.iml
 .gradle/
 /local.properties
