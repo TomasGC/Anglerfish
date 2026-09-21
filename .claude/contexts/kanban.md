@@ -16,11 +16,12 @@
   reflect what actually landed — matching Raven/Otter's convention, and committed to git (only
   `.claude/sessions/` stays gitignored; this was originally set up wrong — `.claude/` was
   gitignored entirely until this note).
-- Issues #1-#7 merged: project skeleton, app-list domain model + filter, DataStore persistence
+- Issues #1-#8 merged: project skeleton, app-list domain model + filter, DataStore persistence
   + `InstalledAppsProvider`, `VpnGateway`/`VpnController` seam, `AnglerfishVpnService` mechanic
   + foreground notification (replaced #4's compile-only stub), `AppListViewModel` state logic,
-  and the Compose UI wiring it all together — the app is now feature-complete for v1's core
-  loop (browse, select, activate/deactivate, persist, notification).
+  the Compose UI wiring it all together, and the manual VpnService verification checklist — the
+  app is feature-complete for v1's core loop (browse, select, activate/deactivate, persist,
+  notification), with only manual on-device execution of that checklist still outstanding.
 - Design spec (`.claude/sessions/specs/2026-09-18-anglerfish-design.md`) and implementation plan
   (`.claude/sessions/plans/2026-09-18-anglerfish-mvp.md`) — the plan's "Task N" now equals
   issue #N exactly (renumbered 2026-09-21; originally split into 4 product-POV + 5
@@ -32,16 +33,27 @@
 
 ## Backlog
 
-**High priority**
-- Issue #9: close out session-continuity docs.
-
 **Not yet done**
 - Manual on-device run-through of the checklist in `docs/manual-testing.md` itself (the doc
   exists as of #8; actually running it on a device hasn't happened yet).
+- No further issues planned beyond #1-#9 — next work starts a fresh brainstorming/spec cycle.
 
 **Ideas**
 - Search/filter/categories/bulk-select on the app list — explicitly out of scope for v1.
 - Device-reboot recovery — explicitly out of scope for v1.
+
+---
+
+2026-09-21 - [#9] Docs refresh: README, .claude/, wiki
+- Original issue #9 scope (commit `.claude/` to git) already happened as a side effect of the
+  per-issue docs-commit convention started at #5 — this issue became a final wrap-up pass instead
+- `tests.md` counts confirmed real (not "target"): 4+4+7 = 15 unit tests, verified via
+  `./gradlew testDebugUnitTest` JUnit XML reports
+- Added root `README.md` (project overview, build instructions, doc links) — didn't exist before
+- Fixed 3 wiki pages that still referenced the pre-renumbering issue scheme and wrongly claimed
+  `.claude/` was gitignored
+tags: #docs #wrap-up
+Ref: https://github.com/TomasGC/Anglerfish/issues/9
 
 ---
 
