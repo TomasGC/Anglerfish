@@ -33,11 +33,30 @@
 ## Backlog
 
 **High priority**
-- Issues #8-#9: manual on-device verification checklist, then close out session-continuity docs.
+- Issue #9: close out session-continuity docs.
+
+**Not yet done**
+- Manual on-device run-through of the checklist in `docs/manual-testing.md` itself (the doc
+  exists as of #8; actually running it on a device hasn't happened yet).
 
 **Ideas**
 - Search/filter/categories/bulk-select on the app list — explicitly out of scope for v1.
 - Device-reboot recovery — explicitly out of scope for v1.
+
+---
+
+2026-09-21 - [#8] Manual VpnService verification checklist
+- `docs/manual-testing.md`: 8 on-device scenarios (first-run consent, activate/deactivate,
+  notification deactivate action, empty-selection guard, live restart on selection change,
+  unselect-last-app auto-stop, process-death recovery, establish() failure path)
+- Docs-only, no code — the substitute for automated coverage of `vpn/`, which
+  `VpnService.Builder.establish()` makes impossible to unit test
+- Correction: `.claude/contexts/conventions.md` clarified that `docs:` commits never carry an
+  issue prefix, no exceptions — the controller initially got this wrong by reasoning from
+  Raven's real (inconsistent) git history instead of Anglerfish's own stated convention
+tags: #docs #testing
+Ref: https://github.com/TomasGC/Anglerfish/issues/8
+Commit: 0885f82
 
 ---
 
