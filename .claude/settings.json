@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash:git status",
+      "Bash:git diff",
+      "Bash:git log",
+      "Edit:.claude/contexts/kanban.md",
+      "Edit:.claude/contexts/architecture.md",
+      "Edit:.claude/contexts/design-patterns.md",
+      "Edit:.claude/contexts/commands.md",
+      "Edit:.claude/contexts/conventions.md",
+      "Edit:.claude/contexts/tests.md",
+      "Write:.claude/contexts/kanban.md",
+      "Write:.claude/contexts/architecture.md",
+      "Write:.claude/contexts/design-patterns.md",
+      "Write:.claude/contexts/commands.md",
+      "Write:.claude/contexts/conventions.md",
+      "Write:.claude/contexts/tests.md"
+    ],
+    "ask": [
+      "Edit",
+      "Write",
+      "Bash:git add",
+      "Bash:git commit",
+      "Bash:git push"
+    ]
+  }
+}
