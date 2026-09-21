@@ -16,9 +16,9 @@
   reflect what actually landed — matching Raven/Otter's convention, and committed to git (only
   `.claude/sessions/` stays gitignored; this was originally set up wrong — `.claude/` was
   gitignored entirely until this note).
-- Issues #1-#4 merged: project skeleton, app-list domain model + filter, DataStore persistence
-  + `InstalledAppsProvider`, `VpnGateway`/`VpnController` seam (with a compile-only
-  `AnglerfishVpnService` stub, replaced by #5).
+- Issues #1-#5 merged: project skeleton, app-list domain model + filter, DataStore persistence
+  + `InstalledAppsProvider`, `VpnGateway`/`VpnController` seam, `AnglerfishVpnService` mechanic
+  + foreground notification (replaced #4's compile-only stub).
 - Design spec (`.claude/sessions/specs/2026-09-18-anglerfish-design.md`) and implementation plan
   (`.claude/sessions/plans/2026-09-18-anglerfish-mvp.md`) — the plan's "Task N" now equals
   issue #N exactly (renumbered 2026-09-21; originally split into 4 product-POV + 5
@@ -31,11 +31,29 @@
 ## Backlog
 
 **High priority**
-- Issues #6-#9, in order, per the implementation plan.
+- Issues #7-#9, in order, per the implementation plan.
 
 **Ideas**
 - Search/filter/categories/bulk-select on the app list — explicitly out of scope for v1.
 - Device-reboot recovery — explicitly out of scope for v1.
+
+---
+
+2026-09-21 - [#6] AppListViewModel
+- `AppListUiState`/`AppListItem`/`AppListEvent` (`SelectionEmpty`, `VpnConsentRequired`) +
+  `AppListViewModel`: `toggleApp`, `onActivateClicked`, `onConsentGranted`, `onDeactivateClicked`
+- Empty-selection guard on activate; consent-needed branch defers start to a separate
+  `onConsentGranted()` call; unselecting the last active app stops instead of restarting with an
+  empty set; toggling while active restarts with the full current selection (not just the
+  toggled package)
+- 7 unit tests against `FakeAppRepository`/`FakeVpnGateway`, no real `Context`/`VpnService`/
+  DataStore needed
+- Task review caught a real gap: the "toggle while active" test's original single-app fixture
+  couldn't distinguish "restart with full set" from a hypothetical "restart with just the
+  toggled package" bug — fixed by strengthening the fixture to 2 apps (see the SDD ledger)
+tags: #viewmodel #mvvm #testing
+Ref: https://github.com/TomasGC/Anglerfish/issues/6
+Commits: 04e7a42, 34b131e
 
 ---
 
