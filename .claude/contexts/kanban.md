@@ -16,9 +16,11 @@
   reflect what actually landed — matching Raven/Otter's convention, and committed to git (only
   `.claude/sessions/` stays gitignored; this was originally set up wrong — `.claude/` was
   gitignored entirely until this note).
-- Issues #1-#5 merged: project skeleton, app-list domain model + filter, DataStore persistence
+- Issues #1-#7 merged: project skeleton, app-list domain model + filter, DataStore persistence
   + `InstalledAppsProvider`, `VpnGateway`/`VpnController` seam, `AnglerfishVpnService` mechanic
-  + foreground notification (replaced #4's compile-only stub).
+  + foreground notification (replaced #4's compile-only stub), `AppListViewModel` state logic,
+  and the Compose UI wiring it all together — the app is now feature-complete for v1's core
+  loop (browse, select, activate/deactivate, persist, notification).
 - Design spec (`.claude/sessions/specs/2026-09-18-anglerfish-design.md`) and implementation plan
   (`.claude/sessions/plans/2026-09-18-anglerfish-mvp.md`) — the plan's "Task N" now equals
   issue #N exactly (renumbered 2026-09-21; originally split into 4 product-POV + 5
@@ -31,11 +33,27 @@
 ## Backlog
 
 **High priority**
-- Issues #7-#9, in order, per the implementation plan.
+- Issues #8-#9: manual on-device verification checklist, then close out session-continuity docs.
 
 **Ideas**
 - Search/filter/categories/bulk-select on the app list — explicitly out of scope for v1.
 - Device-reboot recovery — explicitly out of scope for v1.
+
+---
+
+2026-09-21 - [#7] Compose UI wiring
+- `AppListScreen`: top-bar Activate/Deactivate switch, `LazyColumn` of apps with checkboxes,
+  snackbar for the empty-selection guard
+- `MainActivity` fully replaced (was #1's placeholder): builds the ViewModel via
+  `AnglerfishApplication.container`, wires the VPN consent `ActivityResultLauncher` (on
+  `RESULT_OK` calls `onConsentGranted()` directly — never re-checks consent by calling
+  `onActivateClicked()` again, which would lose the original activation intent), requests the
+  Android 13+ notification permission before activating (non-blocking on denial)
+- App is now feature-complete for v1's core loop: browse, select, activate/deactivate, persist
+  across restart, foreground notification
+tags: #ui #compose #consent-flow
+Ref: https://github.com/TomasGC/Anglerfish/issues/7
+Commit: 8dfb78d
 
 ---
 
