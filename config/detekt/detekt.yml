@@ -1,0 +1,6 @@
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*'
+    # Composable functions use PascalCase per Compose convention.
+    ignoreAnnotated: ['Composable']

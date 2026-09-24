@@ -1,0 +1,7 @@
+# OSV Scanner configuration
+# Anglerfish has no dependency overrides yet — no Hilt/kapt or other build-tool
+# dependencies with known false-positive CVEs like Raven's Dagger/kapt stack.
+# Add [[PackageOverrides]] entries here as real findings require them, following
+# Raven's .osv-scanner.toml as the pattern (each override documents which real
+# CVE it suppresses and why the flagged dependency is a build-tool-only,
+# never-shipped-in-the-APK artifact).
