@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kover)
 }
 
 android {
@@ -54,4 +55,26 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 
     debugImplementation(libs.compose.ui.tooling)
+}
+
+// Generates the XML report scripts/manage.py's coverage command reads (app/build/reports/kover/
+// reportDebug.xml). No verify{} threshold gate here on purpose — see issue #19's "Out of scope":
+// enforcing a minimum is a separate decision from wiring up the mechanism. manage.py's own
+// Python-side 80% check stays a soft report/warning until that decision is made.
+koverReport {
+    androidReports("debug") {
+        filters {
+            excludes {
+                classes(
+                    "**.R",
+                    "**.R$*",
+                    "**.BuildConfig",
+                    "**.Manifest*",
+                    "**.*Test*",
+                    "android.*",
+                    "androidx.*",
+                )
+            }
+        }
+    }
 }
