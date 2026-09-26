@@ -1,0 +1,109 @@
+# OSV Scanner configuration
+# Build tool dependencies pulled in by Android Gradle Plugin (AGP) are excluded
+# because they are never shipped in the APK and only affect the build environment.
+# Copied from the sibling project Raven, which hit the same AGP-internal build-tool
+# dependencies (same AGP/Gradle version family) — same overrides apply here.
+
+[[PackageOverrides]]
+name = "com.google.protobuf:protobuf-java"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP build tool dependency, not shipped in APK"
+
+[[PackageOverrides]]
+name = "commons-io:commons-io"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP build tool dependency, not shipped in APK"
+
+[[PackageOverrides]]
+name = "io.netty:netty-codec"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP internal networking stack (build daemon), not shipped in APK"
+
+[[PackageOverrides]]
+name = "io.netty:netty-codec-http"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP internal networking stack (build daemon), not shipped in APK"
+
+[[PackageOverrides]]
+name = "io.netty:netty-codec-http2"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP internal networking stack (build daemon), not shipped in APK"
+
+[[PackageOverrides]]
+name = "io.netty:netty-common"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP internal networking stack (build daemon), not shipped in APK"
+
+[[PackageOverrides]]
+name = "io.netty:netty-handler"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP internal networking stack (build daemon), not shipped in APK"
+
+[[PackageOverrides]]
+name = "io.netty:netty-handler-proxy"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP internal networking stack (build daemon), not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.apache.commons:commons-lang3"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP build tool dependency, not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.apache.commons:commons-compress"
+version = "1.21"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP build tool dependency, not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.apache.httpcomponents:httpclient"
+version = "4.5.6"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP build tool dependency, not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.bitbucket.b_c:jose4j"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP/Gradle daemon JWT library, not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.bouncycastle:bcpkix-jdk18on"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP/Gradle daemon SSL/TLS library, not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.bouncycastle:bcprov-jdk18on"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP/Gradle daemon cryptography library, not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.freemarker:freemarker"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP/Gradle daemon templating library, not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.jdom:jdom2"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP/Gradle XML parsing library, not shipped in APK"
+
+[[PackageOverrides]]
+name = "org.jetbrains.kotlin:kotlin-gradle-plugin"
+ecosystem = "Maven"
+ignore = true
+reason = "Build-tool dependency, not shipped in APK. GHSA-r937-wjx7-w2jp (CVE-2026-53914, Medium, local-attack-vector-only build-cache deserialization) has no stable fix yet - fix version 2.4.20-Beta1 is a pre-release. Revisit once Kotlin ships a stable 2.4.20+ release."

@@ -1,0 +1,22 @@
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*'
+    # Composable functions use PascalCase per Compose convention.
+    ignoreAnnotated: ['Composable']
+
+complexity:
+  LongParameterList:
+    active: true
+    # Composable functions legitimately take one parameter per callback/state slot
+    # (uiState, events, onToggleApp, onActivateClicked, ...) -- that's the standard
+    # Compose shape, not a code smell to refactor away.
+    ignoreAnnotated: ['Composable']
+
+style:
+  ReturnCount:
+    active: true
+    # Guard-clause style (return early for each invalid/terminal case, e.g.
+    # AnglerfishVpnService.onStartCommand) is preferred over nested if/else here --
+    # raise the default limit of 2 rather than force those into a pyramid.
+    max: 4
