@@ -49,10 +49,49 @@ ViewModel wants the UI to perform, carried through a buffered `Channel`/`Flow` r
 - **Multi-module Gradle split** — Raven's `:core`/solver-module structure exists to prevent a
   real circular dependency (solver modules need the contract, `:app` needs the solver modules).
   Anglerfish has no such cycle: everything lives in `:app`, split into packages, not modules.
-- **Detekt/Kover coverage gate** — no static-analysis/coverage-threshold tooling wired in for
-  the MVP; add it if the codebase grows enough that the sibling projects' 80% gate becomes worth
-  the setup cost here too.
+- **Kover/Detekt coverage *threshold* gate** — Kover and Detekt are both wired in (issue #19:
+  `./gradlew koverXmlReportDebug detekt`, `python scripts/manage.py coverage`), but with no
+  `verify { rule { minBound(80) } }` block in `app/build.gradle.kts` and `coverage-threshold: 0`
+  in `push-ci.yml` — Gradle/CI never fail a build over a specific coverage percentage yet.
+  `CoverageAction`'s own Python-side 80% check is a soft report/warning only. Whether to add a
+  real hard gate (and at what threshold) is deferred until there's enough coverage for a number
+  to mean anything — raise `coverage-threshold` once that's true.
 - **Event bus between `AnglerfishVpnService` and `AppListViewModel`** — the service corrects
   `AppRepository` directly on failure instead of signaling the ViewModel through a separate
   channel (see "Repository as Single Source of Truth" above) — simpler, and the UI already
   observes the repository reactively.
+
+---
+
+## Patterns In Use (added in issue #19)
+
+### Cross-Platform Gradle Dependency-Verification Regeneration
+
+`gradle/verification-metadata.xml` records a checksum per resolved artifact; Gradle refuses to
+build if a downloaded artifact doesn't match. The catch: some artifacts (`aapt2`, Android's build
+tool) ship separate platform-specific jars (`-windows.jar`, `-linux.jar`), so a file generated on
+one OS is missing the other platform's entries. `./gradlew --write-verification-metadata sha256`
+is **additive** — running it again on a different OS adds that OS's entries without touching
+what's already recorded, rather than starting over. The practical recipe when CI reports
+"Dependency verification failed" for a platform-specific artifact: regenerate on that platform
+(a throwaway `push`-triggered GitHub Actions job that uploads the resulting file as a build
+artifact works when you don't have that OS locally — `workflow_dispatch` won't work for a
+workflow that only exists on a feature branch, GitHub requires dispatchable workflows to already
+be on the default branch), download the result, and use it directly — don't hand-merge, the file
+already contains your platform's prior entries too.
+
+### Case-Sensitive Wrapper Checksum Comparison
+
+`gradle-wrapper.properties`' `distributionSha256Sum` is compared as a literal string against the
+freshly-computed (always-lowercase) hash — not case-insensitively. A checksum that is byte-for-byte
+correct except for letter case fails with "Verification of Gradle distribution failed!", the exact
+same message a genuinely wrong or tampered checksum produces. Always lowercase the value.
+
+### Composable-Aware Detekt Overrides
+
+`config/detekt/detekt.yml` relaxes `FunctionNaming` (PascalCase) and `LongParameterList` (one
+parameter per callback/state slot is normal Compose shape, not a smell) for `@Composable`-annotated
+functions specifically, via each rule's `ignoreAnnotated` list — not a blanket suppression, not a
+baseline file grandfathering in violations. `ReturnCount`'s default limit of 2 is raised to 4
+project-wide, since early-return guard clauses (see `AnglerfishVpnService.onStartCommand`) are the
+preferred style here over nested conditionals.

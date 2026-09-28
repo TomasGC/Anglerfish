@@ -76,8 +76,15 @@ sibling Android projects Raven (`C:\dev\repos\GitHub\Raven`) and Otter (`C:\dev\
 for consistency across the user's own Android projects: commit format (`#XXX: type: description`),
 branch naming, package convention (`app.<name>`, not `com.tomasgc.*`), and this six-file
 `contexts/` layout. Where Raven/Otter's own apparatus is disproportionate to Anglerfish's actual
-size — Hilt, the `:core`/solver-module split, the Detekt+Kover coverage gate, the
+size — Hilt, the `:core`/solver-module split, the
 unit/integration-mock/integration-real/instrumented four-tier test structure — Anglerfish adopts
 the *pattern* (documented decisions, a manual-DI seam, a pure-logic/Android-glue split, a unit +
 manual-checklist test split) at a scope appropriate to a one-module, one-screen app, rather than
 copying the scale wholesale.
+
+Issue #19 ported Raven's `scripts/` Python dev-tooling (`manage.py build/test/validate/coverage`,
+see `contexts/commands.md`), Detekt, Kover, and both CI workflows (`push-ci.yml`/`pr-ci.yml`, via
+`TomasGC/condor`'s reusable workflows) wholesale rather than partially — unlike Hilt or a
+multi-module split, none of this tooling scales with app size, so there was no proportionality
+argument against adopting it now. `coverage-threshold: 0` in `push-ci.yml` and no `verify{}` gate
+in Gradle are deliberate interim choices, not oversights — see `contexts/design-patterns.md`.

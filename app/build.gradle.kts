@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kover)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -34,6 +36,34 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+            isIncludeAndroidResources = true
+        }
+        // Not the AVD instrumented tests actually run on (that's manually created via avdmanager
+        // in Condor's kotlin-instrumented-tests.yml) — this managed-device declaration exists only
+        // so `./gradlew pixel4api30Setup` is a real task, letting CI pre-download and cache the
+        // system image before creating that manual AVD.
+        managedDevices {
+            devices {
+                maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("pixel4api30").apply {
+                    device = "Pixel 4"
+                    apiLevel = 30
+                    systemImageSource = "aosp"
+                }
+            }
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/LICENSE-notice.md"
+        }
+    }
 }
 
 dependencies {
@@ -54,4 +84,33 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 
     debugImplementation(libs.compose.ui.tooling)
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+    source.setFrom("$projectDir/src/main/java")
+}
+
+// Generates the XML report scripts/manage.py's coverage command reads (app/build/reports/kover/
+// reportDebug.xml). No verify{} threshold gate here on purpose — see issue #19's "Out of scope":
+// enforcing a minimum is a separate decision from wiring up the mechanism. manage.py's own
+// Python-side 80% check stays a soft report/warning until that decision is made.
+koverReport {
+    androidReports("debug") {
+        filters {
+            excludes {
+                classes(
+                    "**.R",
+                    "**.R$*",
+                    "**.BuildConfig",
+                    "**.Manifest*",
+                    "**.*Test*",
+                    "android.*",
+                    "androidx.*",
+                )
+            }
+        }
+    }
 }

@@ -1,0 +1,30 @@
+name: Push-CI
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'bugfix/**'
+
+concurrency:
+  group: push-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kotlin-pipeline:
+    uses: TomasGC/condor/.github/workflows/kotlin-push-ci.yml@main
+    secrets: inherit
+    with:
+      app-name: anglerfish
+      unit-job: true
+      # Interim: Anglerfish's Kover wiring is brand new with near-zero coverage today.
+      # Raven's default (80) works there because it genuinely has ~95% coverage; copying
+      # that value here would just block every PR. Raise this once real coverage exists —
+      # see issue #19's "Out of scope" note (threshold enforcement is a separate decision
+      # from wiring up the mechanism).
+      coverage-threshold: 0
+
+  python-pipeline:
+    uses: TomasGC/condor/.github/workflows/python-push-ci.yml@main
+    with:
+      skip-on-no-changes: true

@@ -9,3 +9,15 @@
 /app/build/
 /captures
 .cxx/
+.externalNativeBuild
+*.apk
+*.aab
+**/*.local.*
+**/.local/
+.kotlin/
+/temp/
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
