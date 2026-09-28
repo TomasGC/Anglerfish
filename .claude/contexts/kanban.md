@@ -1,36 +1,44 @@
 # Kanban - Anglerfish
 
-**Last Updated**: 2026-09-28
+Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
-## Project Status
-
-- Issues #1-#9 complete: v1 core loop shipped (browse, select, activate/deactivate, persist,
-  notification). One branch per issue off up-to-date `main`, one PR per issue, each branch's
-  last commit updates `.claude/CLAUDE.md` + `contexts/*.md` (committed to git — only
-  `.claude/sessions/` stays gitignored).
-- Design spec/plan renumbered issues #1-#9 to match the plan's Task N exactly (2026-09-21) —
-  see the plan's Global Constraints and the SDD ledger under `.superpowers/sdd/` for why.
-- Issue #19 (Python dev-tooling + CI/CD, ported from Raven) in progress: Push-CI green on the
-  branch, PR not yet opened.
+2026-09-28 - [#20] Fix: app list only showed a handful of OS-exempted apps on real devices
+- Root cause: Android 11+ package visibility — `queryIntentActivities()` silently returns only a
+  small OS-exempted set without a `<queries>` declaration; the user's actual installed apps
+  (browser, social, games) were invisible to the query
+- Fix: added `<queries><intent>` for `ACTION_MAIN`/`CATEGORY_LAUNCHER` to `AndroidManifest.xml`
+  — the one query Android explicitly supports without the heavier, Play-Store-review-gated
+  `QUERY_ALL_PACKAGES` permission
+- No change to `filterUserLaunchableApps`/`isPureSystemApp` — that logic was correct all along,
+  the apps just never reached it
+tags: #bug #manifest #package-visibility
+Ref: https://github.com/TomasGC/Anglerfish/issues/20
 
 ---
 
-## Backlog
-
-**High priority**
-- Issue #19: open the PR, confirm PR-CI also goes green (untestable pre-PR — `workflow_run`
-  only fires once a PR exists).
-
-**Medium priority**
-- Manual on-device run-through of the full `docs/manual-testing.md` checklist (a real
-  wireless-ADB install during #19's `manage.py build` verification confirmed install + launch —
-  the 8-scenario walkthrough itself hasn't been done end-to-end).
-
-**Low priority**
-- Search/filter/categories/bulk-select on the app list — explicitly out of scope for v1.
-- Device-reboot recovery — explicitly out of scope for v1.
+2026-09-26 - [#19] Python dev-tooling (manage.py) and CI/CD, ported from Raven/Otter
+- `scripts/`: Python CLI (`manage.py build/test/validate/coverage/adb`) ported from Raven,
+  adapted for a single-module project (no `-DtestType` tier filter yet)
+- Kover wired in `app/build.gradle.kts` — report generation only, no hard threshold gate
+  (`coverage-threshold: 0` in CI, interim — Raven's default 80 only works there because it has
+  ~95% real coverage)
+- Detekt wired in with Composable-aware overrides (`FunctionNaming`, `LongParameterList`) and a
+  raised `ReturnCount` limit for guard-clause style; 3 real findings fixed in app code
+- `.github/workflows/push-ci.yml` + `pr-ci.yml` via `TomasGC/condor`'s reusable workflows;
+  `.osv-scanner.toml` copied from Raven (same AGP/Gradle-internal build-tool dependency overrides
+  apply — identical version family)
+- Two real bugs found and fixed along the way: `gradlew`'s wrapper checksum was byte-for-byte
+  correct but uppercase (Gradle's comparison is case-sensitive, fails 100% of the time), and
+  `gradlew` had lost its executable bit
+- `gradle/verification-metadata.xml` regenerated to cover both Windows and Linux
+  platform-specific artifacts (`aapt2`) plus Detekt/Lint/Kover's own tool dependencies —
+  `--write-verification-metadata` is additive, so running it again on a different OS adds that
+  OS's entries without needing a hand merge
+tags: #ci #python #detekt #kover #tooling
+Ref: https://github.com/TomasGC/Anglerfish/issues/19
+PR: https://github.com/TomasGC/Anglerfish/pull/21
 
 ---
 
@@ -56,7 +64,7 @@ Commit: 8f88916
 - Docs-only, no code — the substitute for automated coverage of `vpn/`, which
   `VpnService.Builder.establish()` makes impossible to unit test
 - Correction: `.claude/contexts/conventions.md` clarified that `docs:` commits never carry an
-  issue prefix, no exceptions — the controller initially got this wrong by reasoning from
+  issue number, not even in prose — the controller initially got this wrong by reasoning from
   Raven's real (inconsistent) git history instead of Anglerfish's own stated convention
 tags: #docs #testing
 Ref: https://github.com/TomasGC/Anglerfish/issues/8
@@ -166,25 +174,3 @@ tags: #scaffolding #gradle
 Ref: https://github.com/TomasGC/Anglerfish/issues/1
 PR: https://github.com/TomasGC/Anglerfish/pull/10
 Commits: 3d609ee, 0d520f3
-
----
-
-## Ideas
-
-- Coverage threshold: raise `coverage-threshold` in `push-ci.yml` above 0 once there's enough
-  real coverage for a number to mean something (see issue #19).
-- Device-reboot recovery, app-list search/filter — see Backlog's Low priority for the full list.
-
----
-
-## Related Documentation
-
-- `.claude/CLAUDE.md` - Project instructions
-- `.claude/contexts/architecture.md` - Module layout, internal app flow
-- `.claude/contexts/design-patterns.md` - Patterns in use and why
-- `.claude/contexts/tests.md` - Test counts and structure
-- `.claude/sessions/specs/` - Point-in-time design specs (gitignored, local only)
-- `.claude/sessions/plans/` - Point-in-time SDD implementation plans (gitignored, local only)
-- GitHub: https://github.com/TomasGC/Anglerfish/issues,
-  https://github.com/users/TomasGC/projects/10/views/1,
-  https://github.com/TomasGC/Anglerfish/wiki
