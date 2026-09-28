@@ -114,6 +114,9 @@ See `contexts/architecture.md` and `contexts/design-patterns.md` for full detail
 | **Async** | Coroutines | 1.9.0 | Structured concurrency |
 | **Build** | Gradle KTS | AGP 8.6.0 | Kotlin DSL build scripts, version catalog |
 | **Testing** | JUnit4 + kotlinx-coroutines-test | 4.13.2 / 1.9.0 | Unit testing |
+| **Static analysis** | Detekt | 1.23.8 | `./gradlew detekt` — wired in issue #19, config in `config/detekt/detekt.yml` |
+| **Coverage** | Kover | 0.7.6 | `./gradlew koverXmlReportDebug` — report generated, no hard threshold gate (see below) |
+| **Dev tooling / CI** | Python `scripts/manage.py`, GitHub Actions via `TomasGC/condor` | — | Ported from Raven in issue #19 — see `contexts/commands.md` |
 
 These are floor versions — bump to newer stable patches at implementation time if available (see
 the implementation plan's Global Constraints).
@@ -121,8 +124,10 @@ the implementation plan's Global Constraints).
 Versions are **not** required to match the sibling Android projects Raven (`C:\dev\repos\GitHub\Raven`)
 and Otter (`C:\dev\repos\GitHub\otter`) — Anglerfish is much smaller and standalone, and picks its
 own floor versions. The `.claude/` documentation *structure* mirrors both for cross-project
-consistency; the Hilt/multi-module/Detekt+Kover apparatus those two use is deliberately not
-adopted here — see `contexts/design-patterns.md`'s "Patterns Deliberately Not Yet In Use".
+consistency; Hilt and the `:core`/solver-module split are deliberately not adopted here (see
+`contexts/design-patterns.md`'s "Patterns Deliberately Not Yet In Use") — but Detekt, Kover, the
+Python dev-tooling CLI, and the CI pipelines themselves *were* ported wholesale in issue #19,
+since none of those scale with app size the way Hilt/multi-module do.
 
 ---
 

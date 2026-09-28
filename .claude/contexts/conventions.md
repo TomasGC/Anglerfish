@@ -9,8 +9,8 @@ Coding and commit conventions for the Anglerfish Android project.
 **Format**: `#XXX: type: description`
 
 **`docs` exception**: `docs: description` — documentation commits never carry an issue number,
-no exceptions (including a doc that happens to close out a specific issue, like a manual test
-checklist).
+anywhere in the message (not as a prefix, not in prose either), no exceptions — including a doc
+that happens to close out a specific issue, like a manual test checklist.
 
 **Types**: feat, fix, refactor, test, docs, chore
 
@@ -19,7 +19,7 @@ checklist).
 #1: feat: add app-list domain model and system/self filtering
 #6: feat: implement per-app VpnService black-hole tunnel
 docs: add manual VpnService verification checklist
-docs: update contexts for issue #6
+docs: update contexts for ViewModel state logic
 ```
 
 **Rules**:

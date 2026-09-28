@@ -1,44 +1,34 @@
 # Kanban - Anglerfish
 
-**Last Updated**: 2026-09-21
+**Last Updated**: 2026-09-28
 
 ---
 
 ## Project Status
 
-- 9 GitHub issues, each = exactly one implementation-plan task, in dependency order: #1
-  scaffolding, #2 domain model/filter, #3 persistence layer, #4 VpnGateway/Controller, #5
-  VpnService mechanic, #6 ViewModel, #7 Compose UI, #8 manual test checklist, #9 (folded into
-  the per-issue docs-commit convention below — see note).
-- One branch per issue, off up-to-date `main`, one PR per issue, merged before the next issue's
-  branch is created (issues #1-#4 done this way). Each branch's last commit updates
-  `.claude/CLAUDE.md` + `contexts/*.md` + `settings.json` (this file and its siblings) to
-  reflect what actually landed — matching Raven/Otter's convention, and committed to git (only
-  `.claude/sessions/` stays gitignored; this was originally set up wrong — `.claude/` was
-  gitignored entirely until this note).
-- Issues #1-#8 merged: project skeleton, app-list domain model + filter, DataStore persistence
-  + `InstalledAppsProvider`, `VpnGateway`/`VpnController` seam, `AnglerfishVpnService` mechanic
-  + foreground notification (replaced #4's compile-only stub), `AppListViewModel` state logic,
-  the Compose UI wiring it all together, and the manual VpnService verification checklist — the
-  app is feature-complete for v1's core loop (browse, select, activate/deactivate, persist,
-  notification), with only manual on-device execution of that checklist still outstanding.
-- Design spec (`.claude/sessions/specs/2026-09-18-anglerfish-design.md`) and implementation plan
-  (`.claude/sessions/plans/2026-09-18-anglerfish-mvp.md`) — the plan's "Task N" now equals
-  issue #N exactly (renumbered 2026-09-21; originally split into 4 product-POV + 5
-  technical-POV issues describing the same 9 units of work twice, which couldn't each get an
-  independent sequential PR — see the plan's Global Constraints and the SDD ledger under
-  `.superpowers/sdd/` for the full history of that correction).
+- Issues #1-#9 complete: v1 core loop shipped (browse, select, activate/deactivate, persist,
+  notification). One branch per issue off up-to-date `main`, one PR per issue, each branch's
+  last commit updates `.claude/CLAUDE.md` + `contexts/*.md` (committed to git — only
+  `.claude/sessions/` stays gitignored).
+- Design spec/plan renumbered issues #1-#9 to match the plan's Task N exactly (2026-09-21) —
+  see the plan's Global Constraints and the SDD ledger under `.superpowers/sdd/` for why.
+- Issue #19 (Python dev-tooling + CI/CD, ported from Raven) in progress: Push-CI green on the
+  branch, PR not yet opened.
 
 ---
 
 ## Backlog
 
-**Not yet done**
-- Manual on-device run-through of the checklist in `docs/manual-testing.md` itself (the doc
-  exists as of #8; actually running it on a device hasn't happened yet).
-- No further issues planned beyond #1-#9 — next work starts a fresh brainstorming/spec cycle.
+**High priority**
+- Issue #19: open the PR, confirm PR-CI also goes green (untestable pre-PR — `workflow_run`
+  only fires once a PR exists).
 
-**Ideas**
+**Medium priority**
+- Manual on-device run-through of the full `docs/manual-testing.md` checklist (a real
+  wireless-ADB install during #19's `manage.py build` verification confirmed install + launch —
+  the 8-scenario walkthrough itself hasn't been done end-to-end).
+
+**Low priority**
 - Search/filter/categories/bulk-select on the app list — explicitly out of scope for v1.
 - Device-reboot recovery — explicitly out of scope for v1.
 
@@ -54,6 +44,8 @@
   `.claude/` was gitignored
 tags: #docs #wrap-up
 Ref: https://github.com/TomasGC/Anglerfish/issues/9
+PR: https://github.com/TomasGC/Anglerfish/pull/18
+Commit: 8f88916
 
 ---
 
@@ -68,6 +60,7 @@ Ref: https://github.com/TomasGC/Anglerfish/issues/9
   Raven's real (inconsistent) git history instead of Anglerfish's own stated convention
 tags: #docs #testing
 Ref: https://github.com/TomasGC/Anglerfish/issues/8
+PR: https://github.com/TomasGC/Anglerfish/pull/17
 Commit: 0885f82
 
 ---
@@ -84,6 +77,7 @@ Commit: 0885f82
   across restart, foreground notification
 tags: #ui #compose #consent-flow
 Ref: https://github.com/TomasGC/Anglerfish/issues/7
+PR: https://github.com/TomasGC/Anglerfish/pull/16
 Commit: 8dfb78d
 
 ---
@@ -102,6 +96,7 @@ Commit: 8dfb78d
   toggled package" bug — fixed by strengthening the fixture to 2 apps (see the SDD ledger)
 tags: #viewmodel #mvvm #testing
 Ref: https://github.com/TomasGC/Anglerfish/issues/6
+PR: https://github.com/TomasGC/Anglerfish/pull/15
 Commits: 04e7a42, 34b131e
 
 ---
@@ -122,6 +117,7 @@ Commits: 04e7a42, 34b131e
   verification checklist lands in #8
 tags: #vpn #mechanic #foreground-service
 Ref: https://github.com/TomasGC/Anglerfish/issues/5
+PR: https://github.com/TomasGC/Anglerfish/pull/14
 Commit: e54b56a
 
 ---
@@ -175,7 +171,9 @@ Commits: 3d609ee, 0d520f3
 
 ## Ideas
 
-(see Backlog above for near-term; nothing longer-term yet)
+- Coverage threshold: raise `coverage-threshold` in `push-ci.yml` above 0 once there's enough
+  real coverage for a number to mean something (see issue #19).
+- Device-reboot recovery, app-list search/filter — see Backlog's Low priority for the full list.
 
 ---
 
