@@ -4,6 +4,22 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-09-29 - [#30] Display each app's icon next to its name in the list
+- `InstalledAppsProvider.queryBlockableApps()` now loads each app's icon via
+  `PackageManager.getApplicationIcon()` (`androidx.core:core-ktx`'s `Drawable.toBitmap()`),
+  threaded through `InstalledApp` -> `AppListViewModel`'s `AppListItem` -> `AppRow`
+- `icon` is nullable end to end (`InstalledApp`, `AppListItem`) — `null` on a
+  `NameNotFoundException` during the icon lookup (e.g. a stale entry uninstalled between the
+  launcher query and the icon call) falls back to blank spacing in the row rather than crashing
+  the whole list over one app
+- Existing tests (`AppListViewModelTest`) construct `InstalledApp` unchanged — `icon` defaults to
+  `null`, and `Bitmap` isn't constructable outside a real Android runtime anyway
+tags: #ui #compose #icons
+Ref: https://github.com/TomasGC/Anglerfish/issues/30
+Commit: 6a7f63e
+
+---
+
 2026-09-29 - [#25] Misc VpnService/lifecycle bugs found and fixed during real on-device verification
 - Originally scoped as DNS fast-reject (a synthesized NXDOMAIN reply so blocked apps fail DNS
   lookups fast instead of retrying through timeouts) — built, unit-tested, then abandoned and
