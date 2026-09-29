@@ -8,18 +8,20 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import app.anglerfish.AnglerfishApplication
 import app.anglerfish.R
+import app.anglerfish.ui.MainActivity
 import kotlinx.coroutines.runBlocking
 import java.io.FileInputStream
 import kotlin.concurrent.thread
 
 // Scoped to whichever apps are currently selected via addAllowedApplication -- every other app
-// keeps normal connectivity. The interface is a pure black hole: packets read from it are
-// discarded and nothing is written back, which the blocked apps' network stacks observe
-// identically to "no internet". No packet parsing/forwarding -- this is a dead end, not a proxy.
+// keeps normal connectivity. The interface is a black hole for real traffic: no packet is ever
+// forwarded anywhere, and this is never a proxy. Every packet read from it is simply discarded,
+// which the blocked apps' network stacks observe as "no internet".
 //
 // Adapted from a read-only reference in the Raven repo (app.raven.vpn.AdBlockVpnService) --
 // no Raven code is imported. The one structural difference: the allow-list is rebuilt from the
@@ -41,8 +43,16 @@ class AnglerfishVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // A deliberate Stop tap, unlike onRevoke()/establish() failure, quits the whole app --
+        // single process (no android:process split), so this takes MainActivity down with it.
+        // Persisting inactive state before the kill matters doubly now: a stale "active" flag
+        // wouldn't just show a wrong switch, it would make AppListViewModel's launch-time
+        // reconciliation silently re-establish the tunnel the next time the app opens.
         if (intent?.action == ACTION_DEACTIVATE) {
+            teardownTunnel()
+            runBlocking { repository.setActive(false) }
             stopSelf()
+            Process.killProcess(Process.myPid())
             return START_NOT_STICKY
         }
 
@@ -102,11 +112,25 @@ class AnglerfishVpnService : VpnService() {
         return builder.establish()
     }
 
+    // Every packet is read and silently discarded -- the tunnel stays a dead end, not a proxy.
+    //
+    // On-device testing found input.read() can return exactly 0 on this device even on a pure
+    // read-only drain with nothing ever written back. A blocking tun read has no other legitimate
+    // reason to return 0, so this looks like a device/driver-level quirk (real traffic was
+    // observed continuing to arrive normally seconds later) rather than true EOF. Backing off
+    // briefly and retrying, instead of either busy-spinning or giving up, handles both
+    // possibilities safely: self-heals when it's transient, and stays CPU-cheap even if it were
+    // ever sustained (a bounded sleep-and-retry, not an unbounded tight loop).
     private fun drain(pfd: ParcelFileDescriptor) {
         val input = FileInputStream(pfd.fileDescriptor)
         val buffer = ByteArray(PACKET_BUFFER_SIZE)
         while (running) {
-            if (input.read(buffer) < 0) break
+            val length = input.read(buffer)
+            when {
+                length < 0 -> return
+                length == 0 -> Thread.sleep(ZERO_READ_BACKOFF_MS)
+                else -> Unit
+            }
         }
     }
 
@@ -128,6 +152,12 @@ class AnglerfishVpnService : VpnService() {
     }
 
     private fun buildNotification(): Notification {
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
         val deactivateIntent = PendingIntent.getService(
             this,
             0,
@@ -139,6 +169,7 @@ class AnglerfishVpnService : VpnService() {
             .setContentText(getString(R.string.vpn_notification_text))
             .setSmallIcon(R.drawable.ic_anglerfish_notification)
             .setOngoing(true)
+            .setContentIntent(contentIntent)
             .addAction(0, getString(R.string.vpn_notification_deactivate), deactivateIntent)
             .build()
     }
@@ -153,5 +184,6 @@ class AnglerfishVpnService : VpnService() {
         private const val NOTIFICATION_ID = 1
         private const val NOTIFICATION_CHANNEL_ID = "anglerfish_vpn"
         private const val DRAIN_JOIN_TIMEOUT_MS = 500L
+        private const val ZERO_READ_BACKOFF_MS = 10L
     }
 }

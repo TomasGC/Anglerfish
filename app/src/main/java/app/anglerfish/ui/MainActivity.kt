@@ -35,9 +35,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Activation proceeds regardless of grant/deny -- this is the only call site for
+    // viewModel.onActivateClicked() so the notification prompt and the VPN consent prompt never
+    // launch as two overlapping system dialogs from one tap (see onActivateClicked below).
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { /* no-op: activation still proceeds even if the notification permission is denied */ }
+    ) { viewModel.onActivateClicked() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,10 +52,7 @@ class MainActivity : ComponentActivity() {
                         uiState = uiState,
                         events = viewModel.eventFlow,
                         onToggleApp = viewModel::toggleApp,
-                        onActivateClicked = {
-                            requestNotificationPermissionIfNeeded()
-                            viewModel.onActivateClicked()
-                        },
+                        onActivateClicked = ::requestNotificationPermissionThenActivate,
                         onDeactivateClicked = viewModel::onDeactivateClicked,
                         onConsentRequired = ::launchConsent,
                     )
@@ -70,11 +70,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
+    // Requests the notification permission and activation sequentially, never concurrently --
+    // firing both system dialogs from one tap let one silently swallow the other's result
+    // (observed as the VPN never establishing after a fresh install, with no visible error).
+    private fun requestNotificationPermissionThenActivate() {
         val notGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && notGranted) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.onActivateClicked()
         }
     }
 }

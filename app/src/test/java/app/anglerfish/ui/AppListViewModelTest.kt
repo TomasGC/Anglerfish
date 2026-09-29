@@ -146,6 +146,32 @@ class AppListViewModelTest {
     }
 
     @Test
+    fun `construction restarts the vpn when persisted state is active with a non-empty selection`() =
+        runTest(dispatcher) {
+            val repository = FakeAppRepository()
+            val gateway = FakeVpnGateway()
+            repository.toggleSelection("com.example.one")
+            repository.setActive(true)
+
+            AppListViewModel(repository, gateway, installedApps)
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertEquals(setOf("com.example.one"), gateway.startedWith)
+        }
+
+    @Test
+    fun `construction does not restart the vpn when persisted state is inactive`() = runTest(dispatcher) {
+        val repository = FakeAppRepository()
+        val gateway = FakeVpnGateway()
+        repository.toggleSelection("com.example.one")
+
+        AppListViewModel(repository, gateway, installedApps)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(null, gateway.startedWith)
+    }
+
+    @Test
     fun `onDeactivateClicked stops the vpn and marks state inactive`() = runTest(dispatcher) {
         val repository = FakeAppRepository()
         val gateway = FakeVpnGateway()
