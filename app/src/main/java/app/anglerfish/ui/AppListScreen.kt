@@ -1,8 +1,11 @@
 package app.anglerfish.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Checkbox
@@ -18,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.anglerfish.R
@@ -78,7 +82,23 @@ private fun AppRow(app: AppListItem, onToggle: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Icon is the only thing that distinguishes two apps sharing a display label (rebrands,
+        // clones) -- absent only if InstalledAppsProvider couldn't load one, which the row still
+        // renders sanely for rather than crashing over.
+        if (app.icon != null) {
+            Image(
+                bitmap = app.icon.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.size(APP_ICON_SIZE),
+            )
+        } else {
+            Spacer(modifier = Modifier.size(APP_ICON_SIZE))
+        }
+        Spacer(modifier = Modifier.size(APP_ICON_SPACING))
         Text(text = app.label, modifier = Modifier.weight(1f))
         Checkbox(checked = app.isSelected, onCheckedChange = { onToggle() })
     }
 }
+
+private val APP_ICON_SIZE = 40.dp
+private val APP_ICON_SPACING = 12.dp
