@@ -64,8 +64,13 @@ instead.
   always reflects the current selection") over avoiding a brief reconnect blip.
 - **`VpnGateway` interface** exists solely so `AppListViewModel` is unit-testable without a real
   `Context`/`VpnService`.
-- **No device-reboot recovery in v1** — `START_STICKY` covers process-death recovery only; a
-  full reboot requires the user to reactivate manually.
+- **App-launch reconciliation covers process-death and reboot recovery** — `AppListViewModel`
+  restarts the tunnel from the persisted selection as soon as it's constructed, whenever the
+  persisted `isActive` flag says blocking should be on. `START_STICKY` alone only survives a soft
+  kill (`adb shell am kill`, low-memory reclaim); a hard kill (force-stop, swiping the app from
+  recents) or a full reboot both bypass it, leaving a tunnel-less "active" switch until the user
+  reopens the app — which this reconciliation now covers unconditionally, without needing the
+  user to manually toggle off and back on (see issue #25).
 
 ---
 

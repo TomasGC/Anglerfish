@@ -4,6 +4,54 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-09-29 - [#25] Misc VpnService/lifecycle bugs found and fixed during real on-device verification
+- Originally scoped as DNS fast-reject (a synthesized NXDOMAIN reply so blocked apps fail DNS
+  lookups fast instead of retrying through timeouts) — built, unit-tested, then abandoned and
+  removed entirely once real on-device use surfaced a scope mismatch in the underlying design, not
+  in this issue's own code: full per-app blocking makes network-dependent apps (anything that
+  needs a live connection just to render its UI, not only its ads) unusable, not just ad-free.
+  What's actually wanted is closer to uBlock Origin — block known ad domains, forward everything
+  else — which needs a real forwarding proxy, not a black-hole tunnel with a faster rejection
+  reply. That's a different architecture, tracked separately (see #26 and the new proxy-pivot
+  issue), so this issue stayed scoped to real bugs rather than growing to cover it
+- Three genuine bugs surfaced and fixed along the way, independent of the DNS-reject work itself
+  and still valid regardless of it:
+  - **Consent race**: `MainActivity` fired the notification-permission prompt and the VPN-consent
+    prompt from the same tap, concurrently. On a fresh install (new uid, so consent must be
+    re-granted) the two overlapping system dialogs let one silently swallow the other's result —
+    the switch showed active but `establishVpn()` was never called, leaving the selected app on
+    real, unblocked internet. Root-caused from `adb logcat`: zero `establishVpn called by
+    app.anglerfish` entries for the run where an ad loaded through "active" blocking. Fixed by
+    resolving the notification prompt fully before activation proceeds
+  - **Stale active state**: a hard kill (force-stop, swiping from recents) takes the VPN down
+    with it, but bypasses `START_STICKY` and leaves DataStore's persisted `isActive` flag
+    untouched — switch shows on, no tunnel running, nothing corrects it until manually toggled.
+    Fixed by having `AppListViewModel` reconcile persisted state against the real VPN
+    unconditionally on construction, reusing the same `vpnGateway.restart()` call `toggleApp`
+    already makes for live selection changes
+  - **Notification gaps**: tapping the persistent notification's body did nothing (no
+    `setContentIntent`); tapping Stop tore the tunnel down but never persisted the inactive state
+    (so the reconciliation fix above would silently re-establish it next launch); Stop left the
+    rest of the single-process app running instead of quitting it. All three fixed together
+- A fourth finding turned out to be general, not DNS-reject-specific: `input.read()` on the tun fd
+  can return exactly `0` on this device even with nothing ever written back (confirmed via a
+  control run with all writes disabled) — a device/driver-level quirk, not something caused by
+  this issue's own code. A blocking read has no legitimate reason to return `0`; `drain()` now
+  backs off briefly and retries instead of busy-spinning or giving up, which self-heals when the
+  condition is transient (confirmed on-device: hundreds of real packets processed normally in
+  bursts around brief backoff windows) and stays CPU-cheap even if it were ever sustained
+- `docs/manual-testing.md` scenario 7 (process-death recovery) split into soft-kill/hard-kill/
+  reconciliation sub-steps to cover the stale-active-state fix; the DNS fast-reject scenario was
+  added then removed along with the feature itself
+- These bugs only surfaced because they were verified for real, not just unit-tested — spun out
+  into issue #27 (integration-mock/integration-real/instrumented test tiers), design spec at
+  `.claude/sessions/specs/2026-09-29-test-tier-buildout-design.md`
+tags: #vpn #bugfix #vpnservice #lifecycle
+Ref: https://github.com/TomasGC/Anglerfish/issues/25
+Commits: fe9e0d6, 1459ea8
+
+---
+
 2026-09-28 - [#20] Fix: app list only showed a handful of OS-exempted apps on real devices
 - Root cause: Android 11+ package visibility — `queryIntentActivities()` silently returns only a
   small OS-exempted set without a `<queries>` declaration; the user's actual installed apps

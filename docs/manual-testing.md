@@ -53,11 +53,19 @@ activation flow in `AppListViewModel`/`MainActivity`.
 ## 7. Process-death recovery
 
 1. Select one app, activate.
-2. In Android's developer options or via `adb shell am kill app.anglerfish`, kill the Anglerfish
-   process (not the notification's app — the VPN service should survive, or the OS should
-   restart it per `START_STICKY`).
+2. `adb shell am kill app.anglerfish` (soft kill — respects `START_STICKY`).
 3. **Expect:** the notification remains (or briefly reappears) and the selected app is still
-   blocked — reopening Anglerfish shows the switch still on and the same app still selected.
+   blocked without reopening Anglerfish at all.
+4. Reactivate, then `adb shell am force-stop app.anglerfish` (hard kill — bypasses
+   `START_STICKY`; also what a user swiping the app away from recents triggers).
+5. **Expect:** the notification and tunnel are gone immediately — the app is *not* blocked at
+   this point, and the switch still shows on (persisted state survives the kill even though the
+   real tunnel doesn't).
+6. Reopen Anglerfish.
+7. **Expect:** blocking resumes automatically on launch, with no manual toggle needed — the
+   ViewModel reconciles the persisted "active" state against the real VPN as soon as it's
+   constructed. Before this was fixed, the switch stayed stuck showing "on" while the selected
+   app silently had full, unblocked internet until manually toggled off and back on.
 
 ## 8. establish() failure path
 
