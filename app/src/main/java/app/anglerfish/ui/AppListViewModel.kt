@@ -22,6 +22,19 @@ class AppListViewModel(
     private val events = Channel<AppListEvent>(Channel.BUFFERED)
     val eventFlow: Flow<AppListEvent> = events.receiveAsFlow()
 
+    // A process death (force-stop, low-memory kill) takes AnglerfishVpnService down with it, but
+    // DataStore's persisted isActive flag survives -- without this, the switch shows "on" while
+    // no tunnel is actually running, and nothing corrects it until the user manually toggles.
+    // needsConsent() isn't re-checked here: consent was already granted when isActive became true.
+    init {
+        viewModelScope.launch {
+            val state = repository.state.first()
+            if (state.isActive && state.selectedPackages.isNotEmpty()) {
+                vpnGateway.restart(state.selectedPackages)
+            }
+        }
+    }
+
     val uiState: Flow<AppListUiState> = repository.state.combine(flowOf(installedApps)) { blockingState, apps ->
         AppListUiState(
             apps = apps.map { app ->

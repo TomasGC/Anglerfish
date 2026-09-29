@@ -39,6 +39,29 @@ verify.
 ViewModel wants the UI to perform, carried through a buffered `Channel`/`Flow` rather than a
 `StateFlow`, so a rotation/recomposition can't re-fire an already-consumed event.
 
+### Reconcile Persisted State Against Reality on Construction
+
+`AppListViewModel`'s `init` block restarts the tunnel whenever the persisted `isActive` flag is
+true, unconditionally — it doesn't ask *why* the ViewModel is being constructed fresh (first
+launch after a hard kill, after a reboot, after a reinstall that preserved DataStore). Persisted
+state and real system state (the actual `VpnService`) can only drift apart while nothing is
+observing both at once; the fix isn't to catch every way they can drift, it's to always
+re-derive the real state from the persisted one at the one moment a fresh ViewModel is
+guaranteed to run. Reuses `vpnGateway.restart()`, the exact same call `toggleApp` already makes
+for a live selection change — no new interface method needed.
+
+### Backoff-and-Retry on an Anomalous Zero-Length Blocking Read
+
+`AnglerfishVpnService.drain()` treats `input.read(buffer) == 0` as "nothing queued right now,"
+not as EOF — it sleeps briefly and retries, rather than breaking the loop. A blocking read on a
+tun fd has no standard reason to return exactly `0` (only a full packet or `-1` on close), but
+on-device testing found it happens on this hardware even on a pure read-only drain with nothing
+ever written back — a device/driver-level quirk, not application-triggered. Real traffic was
+confirmed to keep arriving normally seconds later, so treating it as fatal (breaking the loop)
+would kill the drain thread and eventually silence the tunnel's discard loop for no real reason.
+A short sleep-and-retry self-heals when it's transient and stays CPU-cheap even if it were ever
+sustained, unlike either busy-spinning on the syscall or giving up on the thread.
+
 ---
 
 ## Patterns Deliberately Not Yet In Use

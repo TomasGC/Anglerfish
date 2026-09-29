@@ -9,9 +9,9 @@
 | Category | Tests | Runner | Description |
 |----------|-------|--------|--------------|
 | Unit (`data/`) | 4 + 4 | JUnit + kotlinx-coroutines-test | `AppListFilterTest` (pure filter logic), `DataStoreAppRepositoryTest` (JVM-only DataStore via `PreferenceDataStoreFactory` + `TemporaryFolder`) |
-| Unit (`ui/`) | 7 | JUnit + kotlinx-coroutines-test | `AppListViewModelTest` against `FakeAppRepository`/`FakeVpnGateway` — empty-selection guard, consent-needed branch, activate/deactivate, auto-restart and auto-stop on selection change |
-| Manual (`vpn/`) | 8 scenarios | On-device checklist | `docs/manual-testing.md` — first-run consent, activate/deactivate, notification deactivate action, empty-selection guard, live restart, unselect-last-app auto-stop, process-death recovery, establish() failure path |
-| **Total automated** | **15** | | |
+| Unit (`ui/`) | 9 | JUnit + kotlinx-coroutines-test | `AppListViewModelTest` against `FakeAppRepository`/`FakeVpnGateway` — empty-selection guard, consent-needed branch, activate/deactivate, auto-restart and auto-stop on selection change, tunnel reconciliation on construction when persisted state is active |
+| Manual (`vpn/`) | 8 scenarios | On-device checklist | `docs/manual-testing.md` — first-run consent, activate/deactivate, notification deactivate action, empty-selection guard, live restart, unselect-last-app auto-stop, process-death recovery (soft kill + hard kill + reconciliation), establish() failure path |
+| **Total automated** | **17** | | |
 
 `InstalledAppsProvider` (the `PackageManager` glue) and the Compose UI (`AppListScreen`,
 `MainActivity`) are not unit tested — they have no branching logic of their own once the pure
