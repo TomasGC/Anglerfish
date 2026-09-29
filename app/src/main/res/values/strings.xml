@@ -6,4 +6,6 @@
     <string name="vpn_notification_deactivate">Deactivate</string>
     <string name="activate_empty_selection">Select at least one app before activating</string>
     <string name="activate_failed">Couldn\'t start blocking — check the VPN permission and try again</string>
+    <string name="search_apps_placeholder">Search apps</string>
+    <string name="search_apps_clear">Clear search</string>
 </resources>
