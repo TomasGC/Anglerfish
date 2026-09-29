@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
                         onActivateClicked = ::requestNotificationPermissionThenActivate,
                         onDeactivateClicked = viewModel::onDeactivateClicked,
                         onConsentRequired = ::launchConsent,
+                        onSearchQueryChanged = viewModel::onSearchQueryChanged,
                     )
                 }
             }

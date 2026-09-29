@@ -7,6 +7,7 @@ import app.anglerfish.data.InstalledApp
 import app.anglerfish.vpn.VpnGateway
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -35,18 +36,34 @@ class AppListViewModel(
         }
     }
 
-    val uiState: Flow<AppListUiState> = repository.state.combine(flowOf(installedApps)) { blockingState, apps ->
+    private val searchQuery = MutableStateFlow("")
+
+    // Filtering by label happens here, not in a separate pure function like
+    // filterUserLaunchableApps -- that one is about system/self exclusion (a fixed property of
+    // the installed-app set), this is live UI-driven visibility, re-evaluated on every keystroke.
+    val uiState: Flow<AppListUiState> = combine(
+        repository.state,
+        flowOf(installedApps),
+        searchQuery,
+    ) { blockingState, apps, query ->
         AppListUiState(
-            apps = apps.map { app ->
-                AppListItem(
-                    packageName = app.packageName,
-                    label = app.label,
-                    isSelected = app.packageName in blockingState.selectedPackages,
-                    icon = app.icon,
-                )
-            },
+            apps = apps
+                .filter { it.label.contains(query, ignoreCase = true) }
+                .map { app ->
+                    AppListItem(
+                        packageName = app.packageName,
+                        label = app.label,
+                        isSelected = app.packageName in blockingState.selectedPackages,
+                        icon = app.icon,
+                    )
+                },
             isActive = blockingState.isActive,
+            searchQuery = query,
         )
+    }
+
+    fun onSearchQueryChanged(query: String) {
+        searchQuery.value = query
     }
 
     fun toggleApp(packageName: String) {

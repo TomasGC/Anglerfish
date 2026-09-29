@@ -1,6 +1,7 @@
 package app.anglerfish.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,8 +9,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -37,6 +44,7 @@ fun AppListScreen(
     onActivateClicked: () -> Unit,
     onDeactivateClicked: () -> Unit,
     onConsentRequired: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val selectionEmptyMessage = stringResource(R.string.activate_empty_selection)
@@ -66,12 +74,36 @@ fun AppListScreen(
             )
         },
     ) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding)) {
-            items(uiState.apps, key = { it.packageName }) { app ->
-                AppRow(app = app, onToggle = { onToggleApp(app.packageName) })
+        Column(modifier = Modifier.padding(padding)) {
+            SearchField(query = uiState.searchQuery, onQueryChanged = onSearchQueryChanged)
+            LazyColumn {
+                items(uiState.apps, key = { it.packageName }) { app ->
+                    AppRow(app = app, onToggle = { onToggleApp(app.packageName) })
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SearchField(query: String, onQueryChanged: (String) -> Unit) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChanged,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        placeholder = { Text(stringResource(R.string.search_apps_placeholder)) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChanged("") }) {
+                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.search_apps_clear))
+                }
+            }
+        },
+        singleLine = true,
+    )
 }
 
 @Composable

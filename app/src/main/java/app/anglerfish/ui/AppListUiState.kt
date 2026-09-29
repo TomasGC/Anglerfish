@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 data class AppListUiState(
     val apps: List<AppListItem> = emptyList(),
     val isActive: Boolean = false,
+    val searchQuery: String = "",
 )
 
 data class AppListItem(

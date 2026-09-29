@@ -184,4 +184,50 @@ class AppListViewModelTest {
         assertTrue(gateway.stopped)
         assertEquals(false, repository.state.first().isActive)
     }
+
+    @Test
+    fun `search query filters the visible apps by label, case-insensitive`() = runTest(dispatcher) {
+        val repository = FakeAppRepository()
+        val gateway = FakeVpnGateway()
+        val threeApps = listOf(
+            InstalledApp("com.example.one", "Anglerfish"),
+            InstalledApp("com.example.two", "Otter"),
+            InstalledApp("com.example.three", "OTHER"),
+        )
+        val viewModel = AppListViewModel(repository, gateway, threeApps)
+
+        viewModel.onSearchQueryChanged("ot")
+        val visible = viewModel.uiState.first().apps.map { it.packageName }
+
+        assertEquals(setOf("com.example.two", "com.example.three"), visible.toSet())
+    }
+
+    @Test
+    fun `clearing the search query restores the full list`() = runTest(dispatcher) {
+        val repository = FakeAppRepository()
+        val gateway = FakeVpnGateway()
+        val twoApps = listOf(InstalledApp("com.example.one", "One"), InstalledApp("com.example.two", "Two"))
+        val viewModel = AppListViewModel(repository, gateway, twoApps)
+
+        viewModel.onSearchQueryChanged("One")
+        viewModel.onSearchQueryChanged("")
+        val visible = viewModel.uiState.first().apps.map { it.packageName }
+
+        assertEquals(setOf("com.example.one", "com.example.two"), visible.toSet())
+    }
+
+    @Test
+    fun `toggling a selection while search-filtered updates the persisted selection normally`() =
+        runTest(dispatcher) {
+            val repository = FakeAppRepository()
+            val gateway = FakeVpnGateway()
+            val twoApps = listOf(InstalledApp("com.example.one", "One"), InstalledApp("com.example.two", "Two"))
+            val viewModel = AppListViewModel(repository, gateway, twoApps)
+            viewModel.onSearchQueryChanged("One")
+
+            viewModel.toggleApp("com.example.two")
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertEquals(setOf("com.example.two"), repository.state.first().selectedPackages)
+        }
 }
