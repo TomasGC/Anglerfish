@@ -4,6 +4,25 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-09-29 - [#31] Add a search bar to filter the app list
+- `AppListViewModel` gains a `searchQuery` `MutableStateFlow<String>`, combined into `uiState`
+  alongside `repository.state` and the installed-apps list (3-way `combine`, not the 2-arg
+  extension used before); apps filtered by case-insensitive label substring match before mapping
+  to `AppListItem` — filtering lives here, not in `filterUserLaunchableApps`, since that stays
+  about the fixed system/self-exclusion property of the installed-app set, not live UI state
+- `AppListScreen`: `OutlinedTextField` above the list (search icon leading, clear icon trailing
+  when non-empty), wired through a new `onSearchQueryChanged` callback threaded through
+  `MainActivity`'s call site
+- Selection state composes cleanly with the filter with no special-casing — toggling an app while
+  filtered updates `BlockingState.selectedPackages` exactly like an unfiltered toggle, verified by
+  3 new `AppListViewModelTest` cases (filter match, clearing restores the full list, toggle while
+  filtered persists correctly)
+tags: #ui #compose #search
+Ref: https://github.com/TomasGC/Anglerfish/issues/31
+Commit: 4b3d980
+
+---
+
 2026-09-29 - [#30] Display each app's icon next to its name in the list
 - `InstalledAppsProvider.queryBlockableApps()` now loads each app's icon via
   `PackageManager.getApplicationIcon()` (`androidx.core:core-ktx`'s `Drawable.toBitmap()`),
