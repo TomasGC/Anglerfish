@@ -42,6 +42,7 @@ class AppListViewModel(
                     packageName = app.packageName,
                     label = app.label,
                     isSelected = app.packageName in blockingState.selectedPackages,
+                    icon = app.icon,
                 )
             },
             isActive = blockingState.isActive,
