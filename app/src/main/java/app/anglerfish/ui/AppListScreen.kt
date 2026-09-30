@@ -105,12 +105,12 @@ fun AppListScreen(
             SearchField(query = uiState.searchQuery, onQueryChanged = onSearchQueryChanged)
             when (uiState.layout) {
                 AppListLayout.LIST -> LazyColumn {
-                    items(uiState.apps, key = { it.packageName }) { app ->
+                    items(uiState.notSelectedApps, key = { it.packageName }) { app ->
                         AppRow(app = app, onToggle = { onToggleApp(app.packageName) })
                     }
                 }
                 AppListLayout.GRID -> LazyVerticalGrid(columns = GridCells.Fixed(GRID_COLUMNS)) {
-                    items(uiState.apps, key = { it.packageName }) { app ->
+                    items(uiState.notSelectedApps, key = { it.packageName }) { app ->
                         AppGridItem(app = app, onToggle = { onToggleApp(app.packageName) })
                     }
                 }

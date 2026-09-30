@@ -4,7 +4,9 @@ import android.graphics.Bitmap
 import app.anglerfish.data.AppListLayout
 
 data class AppListUiState(
-    val apps: List<AppListItem> = emptyList(),
+    val selectedApps: List<AppListItem> = emptyList(),
+    val notSelectedApps: List<AppListItem> = emptyList(),
+    val hiddenApps: List<AppListItem> = emptyList(),
     val isActive: Boolean = false,
     val searchQuery: String = "",
     val layout: AppListLayout = AppListLayout.LIST,

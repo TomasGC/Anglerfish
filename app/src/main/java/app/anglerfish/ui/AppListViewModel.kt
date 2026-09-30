@@ -48,22 +48,25 @@ class AppListViewModel(
         searchQuery,
         repository.layout,
     ) { blockingState, apps, query, layout ->
+        val filtered = apps.filter { it.label.contains(query, ignoreCase = true) }
+        val (hidden, visible) = filtered.partition { it.packageName in blockingState.hiddenPackages }
+        val (selected, notSelected) = visible.partition { it.packageName in blockingState.selectedPackages }
         AppListUiState(
-            apps = apps
-                .filter { it.label.contains(query, ignoreCase = true) }
-                .map { app ->
-                    AppListItem(
-                        packageName = app.packageName,
-                        label = app.label,
-                        isSelected = app.packageName in blockingState.selectedPackages,
-                        icon = app.icon,
-                    )
-                },
+            selectedApps = selected.map { it.toAppListItem(isSelected = true) },
+            notSelectedApps = notSelected.map { it.toAppListItem(isSelected = false) },
+            hiddenApps = hidden.map { it.toAppListItem(isSelected = false) },
             isActive = blockingState.isActive,
             searchQuery = query,
             layout = layout,
         )
     }
+
+    private fun InstalledApp.toAppListItem(isSelected: Boolean) = AppListItem(
+        packageName = packageName,
+        label = label,
+        isSelected = isSelected,
+        icon = icon,
+    )
 
     fun onSearchQueryChanged(query: String) {
         searchQuery.value = query
@@ -73,6 +76,22 @@ class AppListViewModel(
         viewModelScope.launch {
             val current = repository.layout.first()
             repository.setLayout(if (current == AppListLayout.LIST) AppListLayout.GRID else AppListLayout.LIST)
+        }
+    }
+
+    fun toggleHidden(packageName: String) {
+        viewModelScope.launch {
+            val before = repository.state.first()
+            repository.toggleHidden(packageName)
+            val after = repository.state.first()
+            if (before.isActive && before.selectedPackages != after.selectedPackages) {
+                if (after.selectedPackages.isEmpty()) {
+                    vpnGateway.stop()
+                    repository.setActive(false)
+                } else {
+                    vpnGateway.restart(after.selectedPackages)
+                }
+            }
         }
     }
 
