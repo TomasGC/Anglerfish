@@ -2,6 +2,7 @@ package app.anglerfish.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.anglerfish.data.AppListLayout
 import app.anglerfish.data.AppRepository
 import app.anglerfish.data.InstalledApp
 import app.anglerfish.vpn.VpnGateway
@@ -45,7 +46,8 @@ class AppListViewModel(
         repository.state,
         flowOf(installedApps),
         searchQuery,
-    ) { blockingState, apps, query ->
+        repository.layout,
+    ) { blockingState, apps, query, layout ->
         AppListUiState(
             apps = apps
                 .filter { it.label.contains(query, ignoreCase = true) }
@@ -59,11 +61,19 @@ class AppListViewModel(
                 },
             isActive = blockingState.isActive,
             searchQuery = query,
+            layout = layout,
         )
     }
 
     fun onSearchQueryChanged(query: String) {
         searchQuery.value = query
+    }
+
+    fun toggleLayout() {
+        viewModelScope.launch {
+            val current = repository.layout.first()
+            repository.setLayout(if (current == AppListLayout.LIST) AppListLayout.GRID else AppListLayout.LIST)
+        }
     }
 
     fun toggleApp(packageName: String) {

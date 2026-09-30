@@ -8,4 +8,6 @@
     <string name="activate_failed">Couldn\'t start blocking — check the VPN permission and try again</string>
     <string name="search_apps_placeholder">Search apps</string>
     <string name="search_apps_clear">Clear search</string>
+    <string name="layout_toggle_grid">Switch to grid view</string>
+    <string name="layout_toggle_list">Switch to list view</string>
 </resources>

@@ -1,11 +1,13 @@
 package app.anglerfish.ui
 
 import android.graphics.Bitmap
+import app.anglerfish.data.AppListLayout
 
 data class AppListUiState(
     val apps: List<AppListItem> = emptyList(),
     val isActive: Boolean = false,
     val searchQuery: String = "",
+    val layout: AppListLayout = AppListLayout.LIST,
 )
 
 data class AppListItem(
