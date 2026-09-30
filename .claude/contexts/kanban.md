@@ -4,6 +4,35 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-09-30 - [#32] Add a grid view toggle alongside the list view
+- `AppListLayout` (`LIST`/`GRID`) is a new small enum in `data/`, persisted through
+  `AppRepository`/`DataStoreAppRepository` as its own `stringPreferencesKey` rather than folded
+  into `BlockingState` — layout is a rendering preference, not blocking state, and the two have no
+  reason to change together; a corrupted or pre-migration stored value falls back to `LIST` instead
+  of `enumValueOf` throwing
+- `AppListViewModel.uiState` grows to a 4-way `combine` (state, installed apps, search query,
+  layout); new `toggleLayout()` flips and persists it the same way `toggleApp` mutates selection
+- `AppListScreen`: a `TopAppBar` `IconButton` swaps between a hand-drawn `ic_grid_view` vector
+  (list mode, inviting a switch to grid) and the stock `Icons.Default.List` (grid mode) — checked
+  the compiled `material-icons-core` jar directly and confirmed grid/list glyphs aren't in the core
+  set bundled with material3, so a custom 4-square drawable was cheaper than pulling in the whole
+  `material-icons-extended` artifact for one icon; body branches `LazyColumn` vs. a new
+  `LazyVerticalGrid(GridCells.Fixed(2))` with a `AppGridItem` composable (64dp icon, name below,
+  clickable, primary-color border as the selected-state affordance per the issue's "border, not
+  necessarily a checkbox" option)
+- Both layouts read the same `AppListUiState`/`AppListItem` and the active search filter with no
+  special-casing, same pattern as #31's search landing cleanly under existing selection — verified
+  by 4 new `AppListViewModelTest` cases (uiState reflects persisted layout, toggle persists,
+  toggle-toggle returns to list, grid respects an active search query) plus 2
+  `DataStoreAppRepositoryTest` cases (default, persistence)
+- On-device verification: list → grid → select an app → search-filter in grid mode → force-stop →
+  relaunch, confirming layout, selection and cleared search all land correctly on restart
+tags: #ui #compose #grid #persistence
+Ref: https://github.com/TomasGC/Anglerfish/issues/32
+Commits: 96f5bf3, e3ee07f
+
+---
+
 2026-09-29 - [#31] Add a search bar to filter the app list
 - `AppListViewModel` gains a `searchQuery` `MutableStateFlow<String>`, combined into `uiState`
   alongside `repository.state` and the installed-apps list (3-way `combine`, not the 2-arg

@@ -1,6 +1,6 @@
 # Tests - Anglerfish
 
-**Last Updated**: 2026-09-21
+**Last Updated**: 2026-09-30
 
 ---
 
@@ -8,10 +8,10 @@
 
 | Category | Tests | Runner | Description |
 |----------|-------|--------|--------------|
-| Unit (`data/`) | 4 + 4 | JUnit + kotlinx-coroutines-test | `AppListFilterTest` (pure filter logic), `DataStoreAppRepositoryTest` (JVM-only DataStore via `PreferenceDataStoreFactory` + `TemporaryFolder`) |
-| Unit (`ui/`) | 12 | JUnit + kotlinx-coroutines-test | `AppListViewModelTest` against `FakeAppRepository`/`FakeVpnGateway` — empty-selection guard, consent-needed branch, activate/deactivate, auto-restart and auto-stop on selection change, tunnel reconciliation on construction when persisted state is active, search-query filtering (match, clear, selection while filtered) |
+| Unit (`data/`) | 4 + 6 | JUnit + kotlinx-coroutines-test | `AppListFilterTest` (pure filter logic), `DataStoreAppRepositoryTest` (JVM-only DataStore via `PreferenceDataStoreFactory` + `TemporaryFolder` — selection/active persistence, layout default and persistence) |
+| Unit (`ui/`) | 16 | JUnit + kotlinx-coroutines-test | `AppListViewModelTest` against `FakeAppRepository`/`FakeVpnGateway` — empty-selection guard, consent-needed branch, activate/deactivate, auto-restart and auto-stop on selection change, tunnel reconciliation on construction when persisted state is active, search-query filtering (match, clear, selection while filtered), layout toggling (reflected in uiState, persisted, reversible, respects the active search filter) |
 | Manual (`vpn/`) | 8 scenarios | On-device checklist | `docs/manual-testing.md` — first-run consent, activate/deactivate, notification deactivate action, empty-selection guard, live restart, unselect-last-app auto-stop, process-death recovery (soft kill + hard kill + reconciliation), establish() failure path |
-| **Total automated** | **20** | | |
+| **Total automated** | **26** | | |
 
 `InstalledAppsProvider` (the `PackageManager` glue) and the Compose UI (`AppListScreen`,
 `MainActivity`) are not unit tested — they have no branching logic of their own once the pure
