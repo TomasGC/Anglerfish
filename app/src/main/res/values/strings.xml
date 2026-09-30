@@ -10,4 +10,8 @@
     <string name="search_apps_clear">Clear search</string>
     <string name="layout_toggle_grid">Switch to grid view</string>
     <string name="layout_toggle_list">Switch to list view</string>
+    <string name="section_selected">Selected</string>
+    <string name="section_not_selected">Not selected</string>
+    <string name="section_hidden">Hidden</string>
+    <string name="hide_app">Hide</string>
 </resources>

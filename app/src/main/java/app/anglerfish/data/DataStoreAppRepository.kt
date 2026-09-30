@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 private val SELECTED_PACKAGES_KEY = stringSetPreferencesKey("selected_packages")
 private val IS_ACTIVE_KEY = booleanPreferencesKey("is_active")
 private val LAYOUT_KEY = stringPreferencesKey("app_list_layout")
+private val HIDDEN_PACKAGES_KEY = stringSetPreferencesKey("hidden_packages")
 
 class DataStoreAppRepository(
     private val dataStore: DataStore<Preferences>,
@@ -21,6 +22,7 @@ class DataStoreAppRepository(
         BlockingState(
             selectedPackages = preferences[SELECTED_PACKAGES_KEY].orEmpty(),
             isActive = preferences[IS_ACTIVE_KEY] ?: false,
+            hiddenPackages = preferences[HIDDEN_PACKAGES_KEY].orEmpty(),
         )
     }
 
@@ -31,6 +33,24 @@ class DataStoreAppRepository(
                 current - packageName
             } else {
                 current + packageName
+            }
+        }
+    }
+
+    // An app can't be both selected for blocking and hidden from the list at once -- hiding an
+    // already-selected app deselects it in the same DataStore edit, so the two fields can never
+    // briefly disagree. Unhiding never restores a selection: the app returns to Not Selected.
+    override suspend fun toggleHidden(packageName: String) {
+        dataStore.edit { preferences ->
+            val currentHidden = preferences[HIDDEN_PACKAGES_KEY].orEmpty()
+            val nowHidden = packageName !in currentHidden
+            preferences[HIDDEN_PACKAGES_KEY] = if (nowHidden) {
+                currentHidden + packageName
+            } else {
+                currentHidden - packageName
+            }
+            if (nowHidden) {
+                preferences[SELECTED_PACKAGES_KEY] = preferences[SELECTED_PACKAGES_KEY].orEmpty() - packageName
             }
         }
     }
