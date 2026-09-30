@@ -1,6 +1,6 @@
 # Design Patterns - Anglerfish
 
-**Last Updated**: 2026-09-21
+**Last Updated**: 2026-09-30
 
 ---
 
@@ -118,3 +118,26 @@ functions specifically, via each rule's `ignoreAnnotated` list — not a blanket
 baseline file grandfathering in violations. `ReturnCount`'s default limit of 2 is raised to 4
 project-wide, since early-return guard clauses (see `AnglerfishVpnService.onStartCommand`) are the
 preferred style here over nested conditionals.
+
+## Patterns In Use (added in issue #33)
+
+### Opaque Foreground Content Inside `SwipeToDismissBox`
+
+`SwipeToDismissBox` only hides `backgroundContent` where the foreground `content` slot actually
+paints pixels — it does not clip or mask the background to the foreground's outline. `AppRow`/
+`AppGridItem` have no `background()` of their own, so the "Hide" label was visible at rest on
+every row and cell, not just mid-swipe: any layout gap (padding, border area, empty space beside a
+short label) let the pink background bleed through. Found on-device, not by the unit suite (Compose
+UI has no automated tier here). Fixed once, at the wrapper (`SwipeToHideBox` wraps `content` in
+`Box(Modifier.background(MaterialTheme.colorScheme.surface))`), rather than adding a background to
+every row/cell composable individually — the standard Material3 usage pattern for this composable,
+skipped in the first pass.
+
+### Mutual Exclusion Enforced in One DataStore Transaction
+
+An app can't be both selected for blocking and hidden from the list at once. `DataStoreAppRepository
+.toggleHidden` clears the package from `SELECTED_PACKAGES_KEY` inside the same `dataStore.edit`
+block that adds it to `HIDDEN_PACKAGES_KEY`, so the two fields can never be read in a briefly
+inconsistent state by any observer of `state: Flow<BlockingState>`. Same shape as "Repository as
+Single Source of Truth" above: the invariant lives at the one place that can enforce it atomically,
+not as a rule the ViewModel or UI have to remember to uphold on every call site.

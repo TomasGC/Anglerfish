@@ -4,6 +4,34 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-09-30 - [#33] Hide apps from the list, restructure into collapsible sections
+- `BlockingState.hiddenPackages`, persisted via its own DataStore key; hiding a selected app
+  deselects it in the same `dataStore.edit` transaction, unhiding never reselects it
+- `AppListUiState`'s flat `apps` list becomes three buckets (`selectedApps`/`notSelectedApps`/
+  `hiddenApps`), partitioned after the existing search filter; `toggleHidden()` only restarts/stops
+  the VPN when hiding actually changed the selection, not on every hide
+- `AppListScreen`: both list and grid layouts get three independently collapsible sections
+  (`rememberSaveable`, survives rotation); swipe hides a Selected/Not-selected row or cell, tapping
+  a Hidden one unhides it (same gesture as deselecting) — scope call made mid-implementation after
+  the first on-device pass
+- Three real bugs found and fixed, none caught by the unit suite alone (Compose UI has no
+  automated tier here): on-device testing found `SwipeToDismissBox`'s background permanently
+  visible at rest (only masks itself where the foreground paints opaque pixels, and the row/cell
+  composables had none — same root cause also explained a white-rectangle artifact under some
+  icons that first looked like a #30 regression); a fresh-context final review (Opus) against the
+  whole branch then caught the swipe box coming back "already dismissed" after unhide, and
+  `toggleHidden`'s VPN-restart guard reading the active flag before its own change instead of
+  after, missing a concurrent-deactivate race
+- Plan at `.claude/sessions/plans/2026-09-30-hide-apps-collapsible-sections.md`, executed inline;
+  ledger kept at `.claude/sessions/superpowers/sdd/hide-apps-collapsible-sections/progress.md`
+  (the skill's own `.superpowers/sdd/` default path is disallowed by this user's global instructions)
+- 12 new tests: 5 `DataStoreAppRepositoryTest`, 7 `AppListViewModelTest`
+tags: #ui #compose #data #persistence #swipe
+Ref: https://github.com/TomasGC/Anglerfish/issues/33
+Commits: a0cd3ff, 910df68, 952f170
+
+---
+
 2026-09-30 - [#32] Add a grid view toggle alongside the list view
 - `AppListLayout` (`LIST`/`GRID`) is a new small enum in `data/`, persisted through
   `AppRepository`/`DataStoreAppRepository` as its own `stringPreferencesKey` rather than folded
@@ -29,7 +57,7 @@ Track of work sessions and completed tasks linked to GitHub issues.
   relaunch, confirming layout, selection and cleared search all land correctly on restart
 tags: #ui #compose #grid #persistence
 Ref: https://github.com/TomasGC/Anglerfish/issues/32
-Commits: 96f5bf3, e3ee07f
+Commit: 96f5bf3
 
 ---
 
@@ -112,7 +140,7 @@ Commit: 6a7f63e
   `.claude/sessions/specs/2026-09-29-test-tier-buildout-design.md`
 tags: #vpn #bugfix #vpnservice #lifecycle
 Ref: https://github.com/TomasGC/Anglerfish/issues/25
-Commits: fe9e0d6, 1459ea8
+Commit: fe9e0d6
 
 ---
 

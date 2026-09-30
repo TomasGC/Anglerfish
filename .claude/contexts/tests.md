@@ -8,10 +8,10 @@
 
 | Category | Tests | Runner | Description |
 |----------|-------|--------|--------------|
-| Unit (`data/`) | 4 + 6 | JUnit + kotlinx-coroutines-test | `AppListFilterTest` (pure filter logic), `DataStoreAppRepositoryTest` (JVM-only DataStore via `PreferenceDataStoreFactory` + `TemporaryFolder` — selection/active persistence, layout default and persistence) |
-| Unit (`ui/`) | 16 | JUnit + kotlinx-coroutines-test | `AppListViewModelTest` against `FakeAppRepository`/`FakeVpnGateway` — empty-selection guard, consent-needed branch, activate/deactivate, auto-restart and auto-stop on selection change, tunnel reconciliation on construction when persisted state is active, search-query filtering (match, clear, selection while filtered), layout toggling (reflected in uiState, persisted, reversible, respects the active search filter) |
+| Unit (`data/`) | 4 + 11 | JUnit + kotlinx-coroutines-test | `AppListFilterTest` (pure filter logic), `DataStoreAppRepositoryTest` (JVM-only DataStore via `PreferenceDataStoreFactory` + `TemporaryFolder` — selection/active persistence, layout default and persistence, hidden-package persistence and its mutual exclusion with selection, including a two-package partial-deselect case) |
+| Unit (`ui/`) | 23 | JUnit + kotlinx-coroutines-test | `AppListViewModelTest` against `FakeAppRepository`/`FakeVpnGateway` — empty-selection guard, consent-needed branch, activate/deactivate, auto-restart and auto-stop on selection change, tunnel reconciliation on construction when persisted state is active, search-query filtering (match, clear, selection while filtered, filters within all three buckets), layout toggling (reflected in uiState, persisted, reversible, respects the active search filter), hide/unhide bucket placement and its VPN-restart interaction (stops when it was the last selection, restarts with the remaining selection, no-ops when hiding a not-selected app, ignores a stale active flag read before its own state change) |
 | Manual (`vpn/`) | 8 scenarios | On-device checklist | `docs/manual-testing.md` — first-run consent, activate/deactivate, notification deactivate action, empty-selection guard, live restart, unselect-last-app auto-stop, process-death recovery (soft kill + hard kill + reconciliation), establish() failure path |
-| **Total automated** | **26** | | |
+| **Total automated** | **38** | | |
 
 `InstalledAppsProvider` (the `PackageManager` glue) and the Compose UI (`AppListScreen`,
 `MainActivity`) are not unit tested — they have no branching logic of their own once the pure
