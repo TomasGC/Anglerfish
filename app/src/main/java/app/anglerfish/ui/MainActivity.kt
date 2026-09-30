@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
                         uiState = uiState,
                         events = viewModel.eventFlow,
                         onToggleApp = viewModel::toggleApp,
+                        onToggleHidden = viewModel::toggleHidden,
                         onActivateClicked = ::requestNotificationPermissionThenActivate,
                         onDeactivateClicked = viewModel::onDeactivateClicked,
                         onConsentRequired = ::launchConsent,

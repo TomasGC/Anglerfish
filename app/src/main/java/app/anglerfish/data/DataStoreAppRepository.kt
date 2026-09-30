@@ -44,7 +44,11 @@ class DataStoreAppRepository(
         dataStore.edit { preferences ->
             val currentHidden = preferences[HIDDEN_PACKAGES_KEY].orEmpty()
             val nowHidden = packageName !in currentHidden
-            preferences[HIDDEN_PACKAGES_KEY] = if (nowHidden) currentHidden + packageName else currentHidden - packageName
+            preferences[HIDDEN_PACKAGES_KEY] = if (nowHidden) {
+                currentHidden + packageName
+            } else {
+                currentHidden - packageName
+            }
             if (nowHidden) {
                 preferences[SELECTED_PACKAGES_KEY] = preferences[SELECTED_PACKAGES_KEY].orEmpty() - packageName
             }
