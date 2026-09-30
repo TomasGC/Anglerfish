@@ -1,6 +1,8 @@
 package app.anglerfish.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,13 +11,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -28,10 +36,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.anglerfish.R
+import app.anglerfish.data.AppListLayout
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 
@@ -45,6 +58,7 @@ fun AppListScreen(
     onDeactivateClicked: () -> Unit,
     onConsentRequired: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
+    onToggleLayout: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val selectionEmptyMessage = stringResource(R.string.activate_empty_selection)
@@ -64,6 +78,19 @@ fun AppListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    IconButton(onClick = onToggleLayout) {
+                        if (uiState.layout == AppListLayout.LIST) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_grid_view),
+                                contentDescription = stringResource(R.string.layout_toggle_grid),
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.List,
+                                contentDescription = stringResource(R.string.layout_toggle_list),
+                            )
+                        }
+                    }
                     Switch(
                         checked = uiState.isActive,
                         onCheckedChange = { checked ->
@@ -76,9 +103,16 @@ fun AppListScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             SearchField(query = uiState.searchQuery, onQueryChanged = onSearchQueryChanged)
-            LazyColumn {
-                items(uiState.apps, key = { it.packageName }) { app ->
-                    AppRow(app = app, onToggle = { onToggleApp(app.packageName) })
+            when (uiState.layout) {
+                AppListLayout.LIST -> LazyColumn {
+                    items(uiState.apps, key = { it.packageName }) { app ->
+                        AppRow(app = app, onToggle = { onToggleApp(app.packageName) })
+                    }
+                }
+                AppListLayout.GRID -> LazyVerticalGrid(columns = GridCells.Fixed(GRID_COLUMNS)) {
+                    items(uiState.apps, key = { it.packageName }) { app ->
+                        AppGridItem(app = app, onToggle = { onToggleApp(app.packageName) })
+                    }
                 }
             }
         }
@@ -132,5 +166,47 @@ private fun AppRow(app: AppListItem, onToggle: () -> Unit) {
     }
 }
 
+@Composable
+private fun AppGridItem(app: AppListItem, onToggle: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .padding(GRID_CELL_OUTER_PADDING)
+            .clickable(onClick = onToggle)
+            .border(
+                width = GRID_SELECTION_BORDER_WIDTH,
+                color = if (app.isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(GRID_CELL_CORNER_RADIUS),
+            )
+            .padding(GRID_CELL_INNER_PADDING),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (app.icon != null) {
+            Image(
+                bitmap = app.icon.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.size(GRID_ICON_SIZE),
+            )
+        } else {
+            Spacer(modifier = Modifier.size(GRID_ICON_SIZE))
+        }
+        Text(
+            text = app.label,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .fillMaxWidth(),
+        )
+    }
+}
+
 private val APP_ICON_SIZE = 40.dp
 private val APP_ICON_SPACING = 12.dp
+
+private const val GRID_COLUMNS = 2
+private val GRID_ICON_SIZE = 64.dp
+private val GRID_SELECTION_BORDER_WIDTH = 2.dp
+private val GRID_CELL_CORNER_RADIUS = 12.dp
+private val GRID_CELL_OUTER_PADDING = 4.dp
+private val GRID_CELL_INNER_PADDING = 8.dp

@@ -59,4 +59,20 @@ class DataStoreAppRepositoryTest {
 
         assertEquals(BlockingState(), state)
     }
+
+    @Test
+    fun `layout defaults to LIST`() = runTest {
+        val repository = createRepository()
+
+        assertEquals(AppListLayout.LIST, repository.layout.first())
+    }
+
+    @Test
+    fun `setLayout persists the chosen layout`() = runTest {
+        val repository = createRepository()
+
+        repository.setLayout(AppListLayout.GRID)
+
+        assertEquals(AppListLayout.GRID, repository.layout.first())
+    }
 }

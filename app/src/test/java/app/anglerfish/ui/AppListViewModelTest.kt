@@ -1,5 +1,6 @@
 package app.anglerfish.ui
 
+import app.anglerfish.data.AppListLayout
 import app.anglerfish.data.AppRepository
 import app.anglerfish.data.BlockingState
 import app.anglerfish.data.InstalledApp
@@ -36,7 +37,9 @@ class AppListViewModelTest {
 
     private class FakeAppRepository : AppRepository {
         private val flow = MutableStateFlow(BlockingState())
+        private val layoutFlow = MutableStateFlow(AppListLayout.LIST)
         override val state: Flow<BlockingState> = flow
+        override val layout: Flow<AppListLayout> = layoutFlow
         override suspend fun toggleSelection(packageName: String) {
             val current = flow.value.selectedPackages
             flow.value = flow.value.copy(
@@ -45,6 +48,9 @@ class AppListViewModelTest {
         }
         override suspend fun setActive(active: Boolean) {
             flow.value = flow.value.copy(isActive = active)
+        }
+        override suspend fun setLayout(layout: AppListLayout) {
+            layoutFlow.value = layout
         }
     }
 
@@ -230,4 +236,56 @@ class AppListViewModelTest {
 
             assertEquals(setOf("com.example.two"), repository.state.first().selectedPackages)
         }
+
+    @Test
+    fun `uiState reflects the persisted layout`() = runTest(dispatcher) {
+        val repository = FakeAppRepository()
+        val gateway = FakeVpnGateway()
+        val viewModel = AppListViewModel(repository, gateway, installedApps)
+
+        assertEquals(AppListLayout.LIST, viewModel.uiState.first().layout)
+    }
+
+    @Test
+    fun `toggleLayout switches from list to grid and persists it`() = runTest(dispatcher) {
+        val repository = FakeAppRepository()
+        val gateway = FakeVpnGateway()
+        val viewModel = AppListViewModel(repository, gateway, installedApps)
+
+        viewModel.toggleLayout()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(AppListLayout.GRID, repository.layout.first())
+        assertEquals(AppListLayout.GRID, viewModel.uiState.first().layout)
+    }
+
+    @Test
+    fun `toggleLayout twice returns to list`() = runTest(dispatcher) {
+        val repository = FakeAppRepository()
+        val gateway = FakeVpnGateway()
+        val viewModel = AppListViewModel(repository, gateway, installedApps)
+
+        viewModel.toggleLayout()
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.toggleLayout()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(AppListLayout.LIST, repository.layout.first())
+    }
+
+    @Test
+    fun `grid layout still respects the active search filter`() = runTest(dispatcher) {
+        val repository = FakeAppRepository()
+        val gateway = FakeVpnGateway()
+        val twoApps = listOf(InstalledApp("com.example.one", "One"), InstalledApp("com.example.two", "Two"))
+        val viewModel = AppListViewModel(repository, gateway, twoApps)
+        viewModel.onSearchQueryChanged("One")
+
+        viewModel.toggleLayout()
+        dispatcher.scheduler.advanceUntilIdle()
+        val state = viewModel.uiState.first()
+
+        assertEquals(AppListLayout.GRID, state.layout)
+        assertEquals(listOf("com.example.one"), state.apps.map { it.packageName })
+    }
 }

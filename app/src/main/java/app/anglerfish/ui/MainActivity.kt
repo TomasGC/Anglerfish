@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
                         onDeactivateClicked = viewModel::onDeactivateClicked,
                         onConsentRequired = ::launchConsent,
                         onSearchQueryChanged = viewModel::onSearchQueryChanged,
+                        onToggleLayout = viewModel::toggleLayout,
                     )
                 }
             }
