@@ -84,7 +84,7 @@ class AppListViewModel(
             val before = repository.state.first()
             repository.toggleHidden(packageName)
             val after = repository.state.first()
-            if (before.isActive && before.selectedPackages != after.selectedPackages) {
+            if (after.isActive && before.selectedPackages != after.selectedPackages) {
                 if (after.selectedPackages.isEmpty()) {
                     vpnGateway.stop()
                     repository.setActive(false)

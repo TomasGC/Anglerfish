@@ -208,12 +208,16 @@ private fun SectionHeader(title: String, count: Int, expanded: Boolean, onToggle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToHideBox(onDismissed: () -> Unit, content: @Composable () -> Unit) {
+    // Returns false (never confirms the dismissed state) so the box always animates back to
+    // Settled -- the hidden app leaves this list via the ViewModel's state change instead, and
+    // without this, a swiped item's saved SwipeToDismissBoxValue could come back "already
+    // dismissed" if the same key (packageName) is reused for the app once it's unhidden.
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value != SwipeToDismissBoxValue.Settled) {
                 onDismissed()
             }
-            true
+            false
         },
     )
     SwipeToDismissBox(

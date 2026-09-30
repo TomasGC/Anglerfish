@@ -83,6 +83,19 @@ class DataStoreAppRepositoryTest {
     }
 
     @Test
+    fun `hiding one of two selected packages leaves the other selected`() = runTest {
+        val repository = createRepository()
+        repository.toggleSelection("com.example.one")
+        repository.toggleSelection("com.example.two")
+
+        repository.toggleHidden("com.example.one")
+
+        val state = repository.state.first()
+        assertEquals(setOf("com.example.two"), state.selectedPackages)
+        assertEquals(setOf("com.example.one"), state.hiddenPackages)
+    }
+
+    @Test
     fun `unhiding a package does not restore its selection`() = runTest {
         val repository = createRepository()
         repository.toggleSelection("com.example.one")

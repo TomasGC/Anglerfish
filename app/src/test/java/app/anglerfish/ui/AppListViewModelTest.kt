@@ -38,6 +38,10 @@ class AppListViewModelTest {
     private class FakeAppRepository : AppRepository {
         private val flow = MutableStateFlow(BlockingState())
         private val layoutFlow = MutableStateFlow(AppListLayout.LIST)
+        // Test-only: simulates another caller (e.g. onDeactivateClicked) completing a
+        // setActive(false) while this toggleHidden call is still in flight, to reproduce the
+        // race between reading state before and after the repository call.
+        var deactivateDuringToggleHidden = false
         override val state: Flow<BlockingState> = flow
         override val layout: Flow<AppListLayout> = layoutFlow
         override suspend fun toggleSelection(packageName: String) {
@@ -52,6 +56,7 @@ class AppListViewModelTest {
             flow.value = flow.value.copy(
                 hiddenPackages = if (nowHidden) currentHidden + packageName else currentHidden - packageName,
                 selectedPackages = if (nowHidden) flow.value.selectedPackages - packageName else flow.value.selectedPackages,
+                isActive = if (deactivateDuringToggleHidden) false else flow.value.isActive,
             )
         }
         override suspend fun setActive(active: Boolean) {
@@ -395,4 +400,23 @@ class AppListViewModelTest {
         assertEquals(emptyList<String>(), state.notSelectedApps.map { it.packageName })
         assertEquals(listOf("com.example.hidden"), state.hiddenApps.map { it.packageName })
     }
+
+    @Test
+    fun `toggleHidden does not restart the vpn if it was deactivated during the same operation`() =
+        runTest(dispatcher) {
+            val repository = FakeAppRepository()
+            val gateway = FakeVpnGateway()
+            val twoApps = listOf(InstalledApp("com.example.one", "One"), InstalledApp("com.example.two", "Two"))
+            val viewModel = AppListViewModel(repository, gateway, twoApps)
+            dispatcher.scheduler.advanceUntilIdle() // flush construction-time reconciliation (no-op: default state)
+            repository.toggleSelection("com.example.one")
+            repository.toggleSelection("com.example.two")
+            repository.setActive(true)
+            repository.deactivateDuringToggleHidden = true
+
+            viewModel.toggleHidden("com.example.one")
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertEquals(null, gateway.startedWith)
+        }
 }
