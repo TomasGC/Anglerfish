@@ -4,6 +4,52 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-10-01 - [#39] Ad-domain blocklist: remote refresh, user additions
+- Two-layer blocklist (24h-refreshed remote cache + user additions), merged additions-only with no
+  precedence conflicts — the data layer issue #40's DNS interception will consume. No new Gradle
+  dependency: `HttpURLConnection` (via a `BlocklistFetcher` seam mirroring `VpnGateway`'s pattern),
+  DataStore, a plain state-switch for navigation — Room/SQLite and Jetpack Navigation Compose both
+  considered and rejected as disproportionate to two string sets and one new screen
+- Originally designed with a third layer — a bundled asset snapshot of the full StevenBlack/hosts
+  list, so first-launch-before-any-fetch still blocked something. Dropped after PR #45's CI run:
+  the 2.2MB asset tripped the shared `condor` large-file gate (500KB cap, even gzip-9 only reached
+  ~563KB). A trimmed bundled subset would have meant maintaining a second blocklist, so the layer
+  was removed entirely instead — `AnglerfishApplication.onCreate()` already calls
+  `refreshIfStale()` unconditionally with `lastFetch` defaulting to 0, so first launch already
+  starts a real fetch immediately; coverage is just empty until that lands, rather than
+  instant-but-stale from a committed snapshot
+- `parseHostsFile`/`isDomainBlocked` (pure, `data/BlocklistParsing.kt`): hosts-file lines accepted
+  only when sinked to `0.0.0.0` with a real (non-self-referential) domain token — rejects
+  StevenBlack's own `127.0.0.1`/`::1` bootstrapping lines (which would otherwise block every
+  `*.local` mDNS name once suffix matching applies) and malformed/HTML 200-responses alike;
+  suffix-aware matching normalizes case and a trailing root dot before comparing labels
+- `DataStoreBlocklistRepository`: `refreshIfStale` only overwrites the 24h remote cache when the
+  fetch parses to something non-empty, so a captive-portal page or transient garbage can't silently
+  erase a day of coverage; lives in its own `anglerfish_blocklist_prefs` DataStore file, separate
+  from frequently-written app state, since Preferences DataStore rewrites its entire backing file
+  on every edit
+- `BlocklistScreen` (new, reached via `AppListScreen`'s overflow menu) + `BlocklistViewModel`:
+  add/remove user-added domains, each lowercased and trimmed before persisting; `MainActivity`
+  wires the system back button to return to the app list instead of exiting
+- Fresh-reviewer final review (Opus) caught 3 Critical (Detekt `LongMethod`/`SwallowedException`/
+  `MaxLineLength` — would have failed CI's lint-checks job) and 6 Important findings, all fixed in
+  one pass, each verified RED→GREEN: missing back-navigation, the shared-DataStore and
+  synchronous-asset-load issues above, and the strict-parsing/case-normalization work above (the
+  lax-parsing gap traces back to a test-input fix made mid-Task-1, ledgered as a Ruling at the
+  time, that the reviewer correctly flagged as hiding a real design gap rather than just a bad
+  fixture). One finding (per-call re-parsing performance in `isBlocked`) deferred to #40 as a
+  Ruling — nothing calls it live yet, and the right caching shape depends on #40's actual call
+  pattern
+- 31 new tests (80 total, up from 49): 15 `BlocklistParsingTest`, 11 `DataStoreBlocklistRepositoryTest`,
+  5 `BlocklistViewModelTest`
+- Design spec: `.claude/sessions/specs/2026-10-01-ad-domain-blocklist-design.md`; plan:
+  `.claude/sessions/plans/2026-10-01-ad-domain-blocklist.md`
+tags: #data #datastore #networking #ui #review
+Ref: https://github.com/TomasGC/Anglerfish/issues/39
+Commits: a32f0cb, f464ba5, acc62df
+
+---
+
 2026-10-01 - [#38] Per-app BlockMode: BlockingState data model
 - `BlockMode` enum (`AdFilterOnly`/`FullBlock`) + `BlockingState.selectedPackages` changes from
   `Set<String>` to `Map<String, BlockMode>` — the foundation issue #28's domain-selective
