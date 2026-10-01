@@ -58,13 +58,17 @@ app.anglerfish.di.*     # manual DI (AppContainer)
 
 ```
 app/src/test/java/app/anglerfish/
-├── data/     # pure logic + JVM-only DataStore tests
-└── ui/       # ViewModel tests against fakes (FakeAppRepository, FakeVpnGateway)
+├── data/     # pure logic, JVM-only DataStore tests, and the Fake/real contract test
+└── ui/       # ViewModel tests against fakes, plus the shared FakeAppRepository fixture
 ```
 
-No tier-suffix naming convention (unlike Raven's `*IntegrationTest`/`*RealIntegrationTest`) —
-Anglerfish has only one automated tier (unit). See `contexts/tests.md` for why `vpn/` and the
-Compose UI stay manual instead of gaining their own automated tiers.
+No Raven/Otter-style tier-suffix directory convention (`tests/unit/`, `tests/integration/mock/`)
+— Anglerfish's two automated categories are unit tests (`*Test.kt`) and one contract test
+(`AppRepositoryContractTest`, run via `FakeAppRepositoryContractTest`/
+`DataStoreAppRepositoryContractTest`) verifying `FakeAppRepository` matches
+`DataStoreAppRepository`'s real behavior. A `ViewModel`-plus-real-repository integration tier was
+tried during issue #38 and reverted (real, documented flakiness, not a style choice) — see
+`contexts/tests.md` for the full reasoning and why `vpn/`/the Compose UI still stay manual.
 
 ### Code Quality
 

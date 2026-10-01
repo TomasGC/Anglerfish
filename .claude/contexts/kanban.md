@@ -4,6 +4,55 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-10-01 - [#38] Per-app BlockMode: BlockingState data model
+- `BlockMode` enum (`AdFilterOnly`/`FullBlock`) + `BlockingState.selectedPackages` changes from
+  `Set<String>` to `Map<String, BlockMode>` — the foundation issue #28's domain-selective
+  ad-filtering pivot depends on. No VPN/UI behavior change: `AnglerfishVpnService` still treats
+  every selected package as full-block until #42 wires mode-aware dispatch
+- `DataStoreAppRepository` persists the map as `"pkg:MODE"`-encoded entries under the existing
+  `selected_packages` key (no new dependency); decode is self-migrating — a legacy bare
+  package-name entry, or one with an unrecognized mode suffix, falls back to `FullBlock` keyed by
+  the real package name, preserving a pre-existing install's current effective behavior rather
+  than silently switching it. New `AppRepository.setMode()` clears the package from
+  `HIDDEN_PACKAGES_KEY` in the same transaction, extending #33's mutual-exclusion invariant
+- Final whole-branch review (fresh Opus reviewer) caught two real bugs before merge, both fixed
+  with RED→GREEN tests: the unrecognized-suffix fallback was keying the entry by the *whole raw
+  string* instead of the decoded package name — invisible, unremovable entry that, if it were the
+  only selection, would build a tunnel with zero `addAllowedApplication` calls, which Android then
+  applies device-wide; and `setMode` wasn't clearing hidden status, breaking #33's invariant for a
+  caller #43 will add
+- Tried a `ViewModel`-plus-real-`DataStoreAppRepository` integration test (only `VpnGateway`
+  faked), motivated by `AppListViewModelTest`'s `FakeAppRepository` having already needed
+  hand-syncing with real repository behavior twice in one session. Surfaced a real, independent bug
+  along the way: a never-cancelled `CoroutineScope(SupervisorJob())` in both that test and the
+  pre-existing `DataStoreAppRepositoryTest` left DataStore's write-actor coroutine alive past each
+  test, reproducibly hanging a full-suite run on Windows (can't delete an open file) — fixed by
+  cancelling the scope in `tearDown()` in both files, kept
+- The `ViewModel`-plus-real-repository test itself was reverted after extensive debugging: in a bare
+  JVM test (no Robolectric, no device), `viewModelScope` is fire-and-forget with no way to await or
+  cancel it from test code, and `Dispatchers.setMain()` is built for fake/synchronous dependencies
+  — pairing it with a real async one surfaced a genuine reentrancy hang
+  (`Dispatchers.Unconfined` resuming inline on DataStore's own actor thread) and a cross-test leak
+  (an orphaned coroutine throwing into an unrelated test once `TemporaryFolder` deleted its backing
+  file). Replaced with `AppRepositoryContractTest` (abstract, 3 assertions) run against both
+  `FakeAppRepositoryContractTest` and `DataStoreAppRepositoryContractTest` — gets the actual
+  Fake/real-parity value without a `ViewModel` or `Dispatchers.Main` substitution anywhere in the
+  loop; `FakeAppRepository` extracted to its own file so both the contract test and
+  `AppListViewModelTest` share one implementation. Confirmed clean across 6 consecutive full-suite
+  runs with live-streamed output (the `gradlew` wrapper's own buffering hid the first hang's cause)
+- `contexts/tests.md`/`conventions.md`/`commands.md` updated: new count (49 automated tests total),
+  the reverted-tier reasoning documented so it isn't retried blind, redundant raw-`gradlew`
+  test/build examples removed in favor of `python scripts/manage.py test`/`build` as the standing
+  preferred entrypoint
+- Design spec: `.claude/sessions/specs/2026-09-30-domain-selective-blocking-design.md`; plan:
+  `.claude/sessions/plans/2026-09-30-blockmode-data-model.md`. Six child issues under #28's tracking
+  issue (#38–#43); this entry covers #38 only
+tags: #data #datastore #testing #migration #review
+Ref: https://github.com/TomasGC/Anglerfish/issues/38
+Commits: fbe9baf, 398c458, 3736f3a, fd9ce2c, 164d5e3
+
+---
+
 2026-09-30 - [#33] Hide apps from the list, restructure into collapsible sections
 - `BlockingState.hiddenPackages`, persisted via its own DataStore key; hiding a selected app
   deselects it in the same `dataStore.edit` transaction, unhiding never reselects it

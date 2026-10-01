@@ -79,22 +79,6 @@ same as Raven's own copy.
 
 ---
 
-## Android Build & Test
-
-```bash
-# Build debug APK
-./gradlew assembleDebug
-
-# Run unit tests (JVM, fast, no device)
-./gradlew testDebugUnitTest
-
-# Run a single test class
-./gradlew testDebugUnitTest --tests "app.anglerfish.data.AppListFilterTest"
-
-# Build + run all unit tests
-./gradlew build
-```
-
 ## Manual Verification (VpnService)
 
 `VpnService.Builder.establish()` cannot be exercised via Gradle — run the checklist in
@@ -106,5 +90,5 @@ same as Raven's own copy.
 ```bash
 git clone https://github.com/TomasGC/Anglerfish.git
 cd Anglerfish
-./gradlew assembleDebug
+python scripts/manage.py build --no-install
 ```
