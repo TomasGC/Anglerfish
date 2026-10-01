@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -12,9 +13,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import app.anglerfish.AnglerfishApplication
 import app.anglerfish.vpn.vpnConsentIntent
+
+private enum class Screen { AppList, Blocklist }
 
 class MainActivity : ComponentActivity() {
 
@@ -25,6 +31,10 @@ class MainActivity : ComponentActivity() {
             vpnGateway = container.vpnController,
             installedApps = container.installedAppsProvider.queryBlockableApps(),
         )
+    }
+
+    private val blocklistViewModel: BlocklistViewModel by viewModels {
+        BlocklistViewModelFactory((application as AnglerfishApplication).container.blocklistRepository)
     }
 
     private val consentLauncher = registerForActivityResult(
@@ -47,18 +57,34 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    val uiState by viewModel.uiState.collectAsState(initial = AppListUiState())
-                    AppListScreen(
-                        uiState = uiState,
-                        events = viewModel.eventFlow,
-                        onToggleApp = viewModel::toggleApp,
-                        onToggleHidden = viewModel::toggleHidden,
-                        onActivateClicked = ::requestNotificationPermissionThenActivate,
-                        onDeactivateClicked = viewModel::onDeactivateClicked,
-                        onConsentRequired = ::launchConsent,
-                        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-                        onToggleLayout = viewModel::toggleLayout,
-                    )
+                    var currentScreen by rememberSaveable { mutableStateOf(Screen.AppList) }
+                    when (currentScreen) {
+                        Screen.AppList -> {
+                            val uiState by viewModel.uiState.collectAsState(initial = AppListUiState())
+                            AppListScreen(
+                                uiState = uiState,
+                                events = viewModel.eventFlow,
+                                onToggleApp = viewModel::toggleApp,
+                                onToggleHidden = viewModel::toggleHidden,
+                                onActivateClicked = ::requestNotificationPermissionThenActivate,
+                                onDeactivateClicked = viewModel::onDeactivateClicked,
+                                onConsentRequired = ::launchConsent,
+                                onSearchQueryChanged = viewModel::onSearchQueryChanged,
+                                onToggleLayout = viewModel::toggleLayout,
+                                onManageBlocklist = { currentScreen = Screen.Blocklist },
+                            )
+                        }
+                        Screen.Blocklist -> {
+                            BackHandler { currentScreen = Screen.AppList }
+                            val userAdditions by blocklistViewModel.userAdditions.collectAsState(initial = emptySet())
+                            BlocklistScreen(
+                                userAdditions = userAdditions.toList().sorted(),
+                                onAddDomain = blocklistViewModel::addDomain,
+                                onRemoveDomain = blocklistViewModel::removeDomain,
+                                onBack = { currentScreen = Screen.AppList },
+                            )
+                        }
+                    }
                 }
             }
         }

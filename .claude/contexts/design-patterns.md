@@ -133,6 +133,41 @@ UI has no automated tier here). Fixed once, at the wrapper (`SwipeToHideBox` wra
 every row/cell composable individually — the standard Material3 usage pattern for this composable,
 skipped in the first pass.
 
+## Patterns In Use (added in issue #39)
+
+### No Bundled Snapshot — First Launch Fetches Live
+
+The design originally bundled a snapshot of the full StevenBlack/hosts list as a 2.2MB app asset,
+so first-launch-before-any-fetch still blocked something. That asset tripped the shared CI
+large-file gate (`condor`'s 500KB cap — even gzip-9 only got it to ~563KB, still over), and a
+trimmed-down bundled subset would have meant maintaining a second, separate blocklist alongside
+the real remote one. Dropped the bundled layer entirely instead:
+`AnglerfishApplication.onCreate()` already calls `refreshIfStale()` unconditionally, and
+`lastFetch` defaults to `0L`, so the very first app launch always starts a real fetch immediately
+— no special-casing needed. The trade-off is explicit: blocking coverage is empty for the
+seconds-to-minutes between first launch and that fetch completing, rather than instant-but-stale
+from a committed snapshot. `DataStoreBlocklistRepository.isBlocked` now merges only the remote
+cache and user additions.
+
+### Reject a Fetched Payload That Fails to Parse
+
+`refreshIfStale` only overwrites the 24h remote cache when `parseHostsFile(body).isNotEmpty()` —
+an HTTP 200 with a captive-portal login page or truncated download parses to nothing, and treating
+that as "fetch succeeded" would silently replace a day's worth of real ad-domain coverage with
+zero coverage. Pairs with `parseHostsFile`'s own strict `0.0.0.0`-sink-only acceptance rule (see
+below): the same strictness that rejects StevenBlack's own non-ad bootstrapping lines also doubles
+as the signal that a response is garbage, with no separate "is this garbage" check needed.
+
+### Sink-Address Gate, Not a Generic Shape Check
+
+`parseHostsFile` requires the hosts-file line's sink address to literally be `"0.0.0.0"` and its
+domain token to not *equal* the sink address — not merely "looks like a hostname" (e.g. "contains a
+dot"), which an IP-address string also satisfies and would have let StevenBlack's own
+self-referential `"0.0.0.0 0.0.0.0"` header line and its `127.0.0.1`/`::1` localhost-alias lines
+through. Caught via TDD: a first attempt using a dot-presence filter didn't actually exclude
+`"0.0.0.0"` (it contains dots too), and only reproducing the real header line as a test case
+surfaced that the precise rule needed was identity-against-the-sink, not shape.
+
 ### Mutual Exclusion Enforced in One DataStore Transaction
 
 An app can't be both selected for blocking and hidden from the list at once. `DataStoreAppRepository
