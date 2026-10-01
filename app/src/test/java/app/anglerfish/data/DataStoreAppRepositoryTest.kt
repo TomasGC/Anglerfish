@@ -3,8 +3,10 @@ package app.anglerfish.data
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -15,9 +17,21 @@ class DataStoreAppRepositoryTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    // Cancelled in tearDown(), which JUnit4 runs before TemporaryFolder's own @Rule cleanup --
+    // an un-cancelled scope leaves DataStore's internal write-actor coroutine alive past the test,
+    // which can race TemporaryFolder deleting a file the actor still holds open (Windows can't
+    // delete an open file, unlike POSIX) and, across a whole suite, accumulate into exactly the
+    // kind of hang this was written to prevent.
+    private val dataStoreScope = CoroutineScope(SupervisorJob())
+
+    @After
+    fun tearDown() {
+        dataStoreScope.cancel()
+    }
+
     private fun createRepository(): DataStoreAppRepository {
         val dataStore = PreferenceDataStoreFactory.create(
-            scope = CoroutineScope(SupervisorJob()),
+            scope = dataStoreScope,
             produceFile = { tempFolder.newFile("test.preferences_pb") },
         )
         return DataStoreAppRepository(dataStore)
