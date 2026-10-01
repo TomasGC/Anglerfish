@@ -32,7 +32,7 @@ class AppListViewModel(
         viewModelScope.launch {
             val state = repository.state.first()
             if (state.isActive && state.selectedPackages.isNotEmpty()) {
-                vpnGateway.restart(state.selectedPackages)
+                vpnGateway.restart(state.selectedPackages.keys)
             }
         }
     }
@@ -89,7 +89,7 @@ class AppListViewModel(
                     vpnGateway.stop()
                     repository.setActive(false)
                 } else {
-                    vpnGateway.restart(after.selectedPackages)
+                    vpnGateway.restart(after.selectedPackages.keys)
                 }
             }
         }
@@ -104,7 +104,7 @@ class AppListViewModel(
                     vpnGateway.stop()
                     repository.setActive(false)
                 } else {
-                    vpnGateway.restart(state.selectedPackages)
+                    vpnGateway.restart(state.selectedPackages.keys)
                 }
             }
         }
@@ -121,14 +121,14 @@ class AppListViewModel(
                 events.send(AppListEvent.VpnConsentRequired)
                 return@launch
             }
-            startBlocking(state.selectedPackages)
+            startBlocking(state.selectedPackages.keys)
         }
     }
 
     fun onConsentGranted() {
         viewModelScope.launch {
             val state = repository.state.first()
-            startBlocking(state.selectedPackages)
+            startBlocking(state.selectedPackages.keys)
         }
     }
 

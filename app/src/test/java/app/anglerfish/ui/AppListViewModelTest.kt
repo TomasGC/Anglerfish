@@ -2,6 +2,7 @@ package app.anglerfish.ui
 
 import app.anglerfish.data.AppListLayout
 import app.anglerfish.data.AppRepository
+import app.anglerfish.data.BlockMode
 import app.anglerfish.data.BlockingState
 import app.anglerfish.data.InstalledApp
 import app.anglerfish.vpn.VpnGateway
@@ -47,7 +48,17 @@ class AppListViewModelTest {
         override suspend fun toggleSelection(packageName: String) {
             val current = flow.value.selectedPackages
             flow.value = flow.value.copy(
-                selectedPackages = if (packageName in current) current - packageName else current + packageName,
+                selectedPackages = if (packageName in current) {
+                    current - packageName
+                } else {
+                    current + (packageName to BlockMode.AdFilterOnly)
+                },
+            )
+        }
+        override suspend fun setMode(packageName: String, mode: BlockMode) {
+            flow.value = flow.value.copy(
+                selectedPackages = flow.value.selectedPackages + (packageName to mode),
+                hiddenPackages = flow.value.hiddenPackages - packageName,
             )
         }
         override suspend fun toggleHidden(packageName: String) {
@@ -247,7 +258,7 @@ class AppListViewModelTest {
             viewModel.toggleApp("com.example.two")
             dispatcher.scheduler.advanceUntilIdle()
 
-            assertEquals(setOf("com.example.two"), repository.state.first().selectedPackages)
+            assertEquals(mapOf("com.example.two" to BlockMode.AdFilterOnly), repository.state.first().selectedPackages)
         }
 
     @Test
@@ -328,7 +339,7 @@ class AppListViewModelTest {
             viewModel.toggleHidden("com.example.one")
             dispatcher.scheduler.advanceUntilIdle()
 
-            assertEquals(emptySet<String>(), repository.state.first().selectedPackages)
+            assertEquals(emptyMap<String, BlockMode>(), repository.state.first().selectedPackages)
             assertEquals(listOf("com.example.one"), viewModel.uiState.first().notSelectedApps.map { it.packageName })
         }
 
