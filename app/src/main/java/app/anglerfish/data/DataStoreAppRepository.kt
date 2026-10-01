@@ -13,6 +13,28 @@ private val SELECTED_PACKAGES_KEY = stringSetPreferencesKey("selected_packages")
 private val IS_ACTIVE_KEY = booleanPreferencesKey("is_active")
 private val LAYOUT_KEY = stringPreferencesKey("app_list_layout")
 private val HIDDEN_PACKAGES_KEY = stringSetPreferencesKey("hidden_packages")
+private const val MODE_SEPARATOR = ':'
+
+// Self-migrating: a pre-existing install's plain package-name entries (no ":MODE" suffix, from
+// before BlockMode existed) decode as FullBlock, preserving their current effective behavior
+// rather than silently switching them to AdFilterOnly. An unrecognized suffix (a future enum
+// value this version doesn't know) falls back the same way instead of crashing, same defensive
+// posture as this file's existing AppListLayout fallback below.
+private fun decodeSelection(raw: Set<String>?): Map<String, BlockMode> =
+    raw.orEmpty().associate { entry ->
+        val separatorIndex = entry.lastIndexOf(MODE_SEPARATOR)
+        if (separatorIndex == -1) {
+            entry to BlockMode.FullBlock
+        } else {
+            val packageName = entry.substring(0, separatorIndex)
+            val modeName = entry.substring(separatorIndex + 1)
+            val mode = BlockMode.entries.find { it.name == modeName } ?: BlockMode.FullBlock
+            packageName to mode
+        }
+    }
+
+private fun encodeSelection(selectedPackages: Map<String, BlockMode>): Set<String> =
+    selectedPackages.map { (packageName, mode) -> "$packageName$MODE_SEPARATOR${mode.name}" }.toSet()
 
 class DataStoreAppRepository(
     private val dataStore: DataStore<Preferences>,
@@ -20,7 +42,7 @@ class DataStoreAppRepository(
 
     override val state: Flow<BlockingState> = dataStore.data.map { preferences ->
         BlockingState(
-            selectedPackages = preferences[SELECTED_PACKAGES_KEY].orEmpty(),
+            selectedPackages = decodeSelection(preferences[SELECTED_PACKAGES_KEY]),
             isActive = preferences[IS_ACTIVE_KEY] ?: false,
             hiddenPackages = preferences[HIDDEN_PACKAGES_KEY].orEmpty(),
         )
@@ -28,12 +50,23 @@ class DataStoreAppRepository(
 
     override suspend fun toggleSelection(packageName: String) {
         dataStore.edit { preferences ->
-            val current = preferences[SELECTED_PACKAGES_KEY].orEmpty()
-            preferences[SELECTED_PACKAGES_KEY] = if (packageName in current) {
+            val current = decodeSelection(preferences[SELECTED_PACKAGES_KEY])
+            val updated = if (packageName in current) {
                 current - packageName
             } else {
-                current + packageName
+                current + (packageName to BlockMode.AdFilterOnly)
             }
+            preferences[SELECTED_PACKAGES_KEY] = encodeSelection(updated)
+        }
+    }
+
+    // Mirrors toggleHidden's mutual-exclusion invariant from the other direction: setting a mode
+    // means the package should now be visible and blocked, so it can't stay hidden.
+    override suspend fun setMode(packageName: String, mode: BlockMode) {
+        dataStore.edit { preferences ->
+            val current = decodeSelection(preferences[SELECTED_PACKAGES_KEY])
+            preferences[SELECTED_PACKAGES_KEY] = encodeSelection(current + (packageName to mode))
+            preferences[HIDDEN_PACKAGES_KEY] = preferences[HIDDEN_PACKAGES_KEY].orEmpty() - packageName
         }
     }
 
@@ -50,7 +83,8 @@ class DataStoreAppRepository(
                 currentHidden - packageName
             }
             if (nowHidden) {
-                preferences[SELECTED_PACKAGES_KEY] = preferences[SELECTED_PACKAGES_KEY].orEmpty() - packageName
+                val current = decodeSelection(preferences[SELECTED_PACKAGES_KEY])
+                preferences[SELECTED_PACKAGES_KEY] = encodeSelection(current - packageName)
             }
         }
     }
