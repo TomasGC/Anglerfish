@@ -1,6 +1,8 @@
 package app.anglerfish.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -43,7 +45,7 @@ class DataStoreAppRepositoryTest {
 
         repository.toggleSelection("com.example.one")
 
-        assertEquals(setOf("com.example.one"), repository.state.first().selectedPackages)
+        assertEquals(mapOf("com.example.one" to BlockMode.AdFilterOnly), repository.state.first().selectedPackages)
     }
 
     @Test
@@ -53,7 +55,7 @@ class DataStoreAppRepositoryTest {
 
         repository.toggleSelection("com.example.one")
 
-        assertEquals(emptySet<String>(), repository.state.first().selectedPackages)
+        assertEquals(emptyMap<String, BlockMode>(), repository.state.first().selectedPackages)
     }
 
     @Test
@@ -93,7 +95,7 @@ class DataStoreAppRepositoryTest {
 
         val state = repository.state.first()
         assertEquals(setOf("com.example.one"), state.hiddenPackages)
-        assertEquals(emptySet<String>(), state.selectedPackages)
+        assertEquals(emptyMap<String, BlockMode>(), state.selectedPackages)
     }
 
     @Test
@@ -105,7 +107,7 @@ class DataStoreAppRepositoryTest {
         repository.toggleHidden("com.example.one")
 
         val state = repository.state.first()
-        assertEquals(setOf("com.example.two"), state.selectedPackages)
+        assertEquals(mapOf("com.example.two" to BlockMode.AdFilterOnly), state.selectedPackages)
         assertEquals(setOf("com.example.one"), state.hiddenPackages)
     }
 
@@ -119,7 +121,7 @@ class DataStoreAppRepositoryTest {
 
         val state = repository.state.first()
         assertEquals(emptySet<String>(), state.hiddenPackages)
-        assertEquals(emptySet<String>(), state.selectedPackages)
+        assertEquals(emptyMap<String, BlockMode>(), state.selectedPackages)
     }
 
     @Test
@@ -145,5 +147,67 @@ class DataStoreAppRepositoryTest {
         repository.setLayout(AppListLayout.GRID)
 
         assertEquals(AppListLayout.GRID, repository.layout.first())
+    }
+
+    @Test
+    fun `setMode changes an already-selected package's mode`() = runTest {
+        val repository = createRepository()
+        repository.toggleSelection("com.example.one")
+
+        repository.setMode("com.example.one", BlockMode.FullBlock)
+
+        assertEquals(mapOf("com.example.one" to BlockMode.FullBlock), repository.state.first().selectedPackages)
+    }
+
+    @Test
+    fun `setMode on a not-yet-selected package selects it with that mode`() = runTest {
+        val repository = createRepository()
+
+        repository.setMode("com.example.one", BlockMode.FullBlock)
+
+        assertEquals(mapOf("com.example.one" to BlockMode.FullBlock), repository.state.first().selectedPackages)
+    }
+
+    @Test
+    fun `a legacy plain-package-name entry migrates to FullBlock`() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
+            produceFile = { tempFolder.newFile("legacy.preferences_pb") },
+        )
+        val legacyKey = stringSetPreferencesKey("selected_packages")
+        dataStore.edit { it[legacyKey] = setOf("com.example.legacy") }
+
+        val repository = DataStoreAppRepository(dataStore)
+
+        assertEquals(mapOf("com.example.legacy" to BlockMode.FullBlock), repository.state.first().selectedPackages)
+    }
+
+    @Test
+    fun `an unrecognized mode suffix falls back to FullBlock instead of crashing`() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
+            produceFile = { tempFolder.newFile("corrupt.preferences_pb") },
+        )
+        val legacyKey = stringSetPreferencesKey("selected_packages")
+        dataStore.edit { it[legacyKey] = setOf("com.example.one:NOT_A_REAL_MODE") }
+
+        val repository = DataStoreAppRepository(dataStore)
+
+        assertEquals(
+            mapOf("com.example.one" to BlockMode.FullBlock),
+            repository.state.first().selectedPackages,
+        )
+    }
+
+    @Test
+    fun `setMode on a hidden package unhides it`() = runTest {
+        val repository = createRepository()
+        repository.toggleHidden("com.example.one")
+
+        repository.setMode("com.example.one", BlockMode.FullBlock)
+
+        val state = repository.state.first()
+        assertEquals(mapOf("com.example.one" to BlockMode.FullBlock), state.selectedPackages)
+        assertEquals(emptySet<String>(), state.hiddenPackages)
     }
 }
