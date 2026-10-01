@@ -14,4 +14,11 @@
     <string name="section_not_selected">Not selected</string>
     <string name="section_hidden">Hidden</string>
     <string name="hide_app">Hide</string>
+    <string name="more_options">More options</string>
+    <string name="manage_blocklist">Manage blocklist</string>
+    <string name="blocklist_screen_title">Blocked domains</string>
+    <string name="blocklist_add_placeholder">Add a domain</string>
+    <string name="blocklist_add_action">Add domain</string>
+    <string name="blocklist_remove_action">Remove domain</string>
+    <string name="back">Back</string>
 </resources>

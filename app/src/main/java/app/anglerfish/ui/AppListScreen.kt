@@ -27,8 +27,11 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,6 +79,7 @@ fun AppListScreen(
     onConsentRequired: () -> Unit,
     onSearchQueryChanged: (String) -> Unit,
     onToggleLayout: () -> Unit,
+    onManageBlocklist: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val selectionEmptyMessage = stringResource(R.string.activate_empty_selection)
@@ -116,6 +120,7 @@ fun AppListScreen(
                             if (checked) onActivateClicked() else onDeactivateClicked()
                         },
                     )
+                    OverflowMenu(onManageBlocklist = onManageBlocklist)
                 },
             )
         },
@@ -131,6 +136,23 @@ fun AppListScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OverflowMenu(onManageBlocklist: () -> Unit) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    IconButton(onClick = { menuExpanded = true }) {
+        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options))
+    }
+    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.manage_blocklist)) },
+            onClick = {
+                menuExpanded = false
+                onManageBlocklist()
+            },
+        )
     }
 }
 
