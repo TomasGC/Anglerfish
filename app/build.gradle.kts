@@ -79,6 +79,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.dnsjava)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
