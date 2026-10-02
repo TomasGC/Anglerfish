@@ -4,6 +4,39 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-10-03 - [#50] Fix 5 deferred Minor findings from #41's final review
+- `Ipv4TcpPacket.parse` now rejects IP fragments (more-fragments flag or nonzero fragment offset),
+  an IHL claiming a header shorter than the 20-byte minimum, and a total-length field claiming more
+  bytes than the buffer actually holds — and bounds the parsed payload to that total-length field
+  instead of trusting the raw array's own size, so trailing bytes past a packet's real end are no
+  longer silently included. Mirrors the equivalent guard `Ipv4UdpPacket` (#40) already had via its
+  UDP length field (M1)
+- `Ipv4TcpSegment`, `TcpSegmentToSend`, and `TcpAction.DeliverToDestination` now override
+  `equals`/`hashCode` to compare their `ByteArray` payload by content — the same reference-equality
+  trap that caused one real test failure during #41 itself, now closed at the type level instead of
+  left for the next caller to rediscover. `Ipv4TcpSegment`'s override groups its non-array fields
+  into one comparable list to keep its own cyclomatic complexity under detekt's threshold (M4)
+- Two comments reworded from session-history phrasing ("a prior issue's review flagged...", "as an
+  earlier version of this file did") to state the durable WHY directly (M5)
+- `UdpRelay.relayLoopBody` dropped a redundant `withContext(Dispatchers.IO)` around `socket.receive()`
+  — the whole coroutine already runs on `Dispatchers.IO` (M6a)
+- `Ipv4TcpPacketTest` gained a checksum test against a value computed independently in Python (a
+  separate RFC 1071 implementation), closing the gap where the two existing checksum tests
+  recomputed the same pseudo-header algorithm the implementation itself uses and so couldn't catch
+  a shared misunderstanding of it. First attempt's expected value was itself wrong (forgot the
+  `segment()` test helper sets `psh=true` for any non-empty payload) — caught immediately since the
+  test failed against the real implementation, re-derived correctly (M8)
+- M2 (MSS option) and M7 (NatRelay timeout test) spun into their own issues (#48, #49) rather than
+  bundled here — each needs its own scoped TDD pass or a convention decision first. M3 (multiple
+  types per file, matching #40's precedent) and M6b (buffer pooling, premature optimization) left
+  as-is, no issue filed
+- 11 new tests (155 total, up from 144): 8 `Ipv4TcpPacketTest`, 3 `TcpStateMachineTest`
+tags: #nat #tcp #review #cleanup
+Ref: https://github.com/TomasGC/Anglerfish/issues/50
+Commits: bd0b8b8, 16b4691, 0dfb08d
+
+---
+
 2026-10-02 - [#41] TCP/UDP NAT relay engine
 - Standalone, fully-testable-at-the-logic-layer NAT/relay engine (`app.anglerfish.nat`): given a
   raw IPv4 packet, dispatches it by 5-tuple to a per-flow `UdpRelay` or `TcpRelay` over a real

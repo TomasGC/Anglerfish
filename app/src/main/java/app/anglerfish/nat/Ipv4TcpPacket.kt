@@ -2,6 +2,9 @@ package app.anglerfish.nat
 
 import java.net.InetAddress
 
+// Overrides equals()/hashCode() because the generated versions compare `payload` by reference,
+// not content -- a real trap for anything that asserts equality on this type (hit once already,
+// see Ipv4TcpPacketTest's history).
 data class Ipv4TcpSegment(
     val sourceAddress: InetAddress,
     val sourcePort: Int,
@@ -16,7 +19,23 @@ data class Ipv4TcpSegment(
     val psh: Boolean,
     val windowSize: Int,
     val payload: ByteArray,
-)
+) {
+    // Grouping the non-array fields into one comparable list keeps this equals()/hashCode() pair's
+    // own cyclomatic complexity low -- a flat chain of 13 `&&`-joined field comparisons trips
+    // detekt's CyclomaticComplexMethod threshold.
+    private fun nonPayloadFields() = listOf(
+        sourceAddress, sourcePort, destAddress, destPort, sequenceNumber, ackNumber,
+        syn, ack, fin, rst, psh, windowSize,
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Ipv4TcpSegment) return false
+        return nonPayloadFields() == other.nonPayloadFields() && payload.contentEquals(other.payload)
+    }
+
+    override fun hashCode(): Int = HASH_PRIME * nonPayloadFields().hashCode() + payload.contentHashCode()
+}
 
 private const val IPV4_HEADER_LENGTH = 20
 private const val TCP_HEADER_LENGTH = 20
@@ -59,6 +78,10 @@ private const val TCP_URGENT_POINTER_OFFSET = 18
 private const val PSEUDO_DEST_OFFSET = 4
 private const val PSEUDO_PROTOCOL_OFFSET = 9
 private const val PSEUDO_LENGTH_OFFSET = 10
+private const val FLAGS_FRAGMENT_OFFSET = 6
+private const val MORE_FRAGMENTS_FLAG = 0x2000
+private const val FRAGMENT_OFFSET_MASK = 0x1FFF
+private const val HASH_PRIME = 31
 
 // Mirrors Ipv4UdpPacket's shape (#40) but for TCP: hand-rolled envelope parsing/building, with a
 // mandatory checksum -- unlike UDP's optional 0, a receiving kernel TCP stack silently discards a
@@ -72,15 +95,21 @@ object Ipv4TcpPacket {
         val version = versionIhl shr VERSION_SHIFT
         val ipHeaderLength = (versionIhl and IHL_MASK) * BYTES_PER_IHL_UNIT
         val protocol = raw[PROTOCOL_OFFSET].toInt() and BYTE_MASK
+        val fragmentField = readUInt16(raw, FLAGS_FRAGMENT_OFFSET)
+        val isFragment = fragmentField and MORE_FRAGMENTS_FLAG != 0 || fragmentField and FRAGMENT_OFFSET_MASK != 0
         val envelopeValid = version == IPV4_VERSION &&
             protocol == PROTOCOL_TCP &&
+            ipHeaderLength >= IPV4_HEADER_LENGTH &&
+            !isFragment &&
             raw.size >= ipHeaderLength + TCP_HEADER_LENGTH
         if (!envelopeValid) return null
 
+        val totalLength = readUInt16(raw, TOTAL_LENGTH_OFFSET)
         val tcpStart = ipHeaderLength
         val dataOffsetWords = (raw[tcpStart + TCP_DATA_OFFSET_BYTE].toInt() and BYTE_MASK) shr DATA_OFFSET_SHIFT
         val tcpHeaderLength = dataOffsetWords * WORDS_TO_BYTES
-        if (tcpHeaderLength < TCP_HEADER_LENGTH || raw.size < tcpStart + tcpHeaderLength) return null
+        val payloadStart = tcpStart + tcpHeaderLength
+        if (tcpHeaderLength < TCP_HEADER_LENGTH || totalLength < payloadStart || totalLength > raw.size) return null
 
         val flags = raw[tcpStart + TCP_FLAGS_OFFSET].toInt() and BYTE_MASK
 
@@ -101,7 +130,7 @@ object Ipv4TcpPacket {
             rst = flags and FLAG_RST != 0,
             psh = flags and FLAG_PSH != 0,
             windowSize = readUInt16(raw, tcpStart + TCP_WINDOW_OFFSET),
-            payload = raw.copyOfRange(tcpStart + tcpHeaderLength, raw.size),
+            payload = raw.copyOfRange(payloadStart, totalLength),
         )
     }
 

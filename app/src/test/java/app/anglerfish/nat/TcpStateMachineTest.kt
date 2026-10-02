@@ -303,4 +303,30 @@ class TcpStateMachineTest {
         val sent = (result.actions.single() as TcpAction.SendSegment).segment
         assertTrue(sent.rst)
     }
+
+    @Test
+    fun `TcpSegmentToSend instances with equal-content but distinct payload arrays are equal`() {
+        val first = TcpSegmentToSend(sequenceNumber = 1L, ackNumber = 2L, payload = byteArrayOf(1, 2, 3))
+        val second = TcpSegmentToSend(sequenceNumber = 1L, ackNumber = 2L, payload = byteArrayOf(1, 2, 3))
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
+
+    @Test
+    fun `TcpSegmentToSend instances with different payload content are not equal`() {
+        val first = TcpSegmentToSend(sequenceNumber = 1L, ackNumber = 2L, payload = byteArrayOf(1, 2, 3))
+        val second = TcpSegmentToSend(sequenceNumber = 1L, ackNumber = 2L, payload = byteArrayOf(9, 9, 9))
+
+        assertFalse(first == second)
+    }
+
+    @Test
+    fun `TcpAction DeliverToDestination instances with equal-content but distinct payload arrays are equal`() {
+        val first = TcpAction.DeliverToDestination(byteArrayOf(4, 5, 6))
+        val second = TcpAction.DeliverToDestination(byteArrayOf(4, 5, 6))
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
 }

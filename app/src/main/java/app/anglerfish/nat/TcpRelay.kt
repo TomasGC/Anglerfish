@@ -17,10 +17,10 @@ import kotlin.random.Random
 // real OS TCP stack on their way out, so every sequence number, ACK, and checksum has to be
 // correct by construction (see TcpStateMachine/Ipv4TcpPacket), not delegated to a socket API.
 //
-// The SYN-ACK is deliberately NOT sent until the real connect() succeeds: sending it immediately
-// (as an earlier version of this file did) let the app complete its three-way handshake and send
-// real data (a TLS ClientHello, an HTTP request) before the real socket existed to receive it,
-// silently dropping the app's first bytes on every connection.
+// The SYN-ACK is deliberately NOT sent until the real connect() succeeds -- sending it any earlier
+// would let the app complete its three-way handshake and send real data (a TLS ClientHello, an
+// HTTP request) before the real socket exists to receive it, silently dropping the app's first
+// bytes on every connection.
 class TcpRelay(
     private val vpnService: VpnService,
     private val endpoints: FlowEndpoints,

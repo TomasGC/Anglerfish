@@ -2,6 +2,7 @@ package app.anglerfish.nat
 
 private const val SEQ_MOD_MASK = 0xFFFFFFFFL
 private const val DEFAULT_PEER_WINDOW = 65535
+private const val HASH_PRIME = 31
 
 enum class TcpConnectionState { SYN_RECEIVED, ESTABLISHED, CLOSE_WAIT, LAST_ACK, FIN_WAIT, CLOSED }
 
@@ -20,6 +21,8 @@ data class TcpConnection(
     val appWindow: Int = DEFAULT_PEER_WINDOW,
 )
 
+// Overrides equals()/hashCode() because the generated versions compare `payload` by reference,
+// not content -- the same ByteArray-in-a-data-class trap TcpStateMachineTest hit once already.
 data class TcpSegmentToSend(
     val sequenceNumber: Long,
     val ackNumber: Long,
@@ -28,11 +31,44 @@ data class TcpSegmentToSend(
     val fin: Boolean = false,
     val rst: Boolean = false,
     val payload: ByteArray = ByteArray(0),
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is TcpSegmentToSend) return false
+        return sequenceNumber == other.sequenceNumber &&
+            ackNumber == other.ackNumber &&
+            syn == other.syn &&
+            ack == other.ack &&
+            fin == other.fin &&
+            rst == other.rst &&
+            payload.contentEquals(other.payload)
+    }
+
+    override fun hashCode(): Int {
+        var result = sequenceNumber.hashCode()
+        result = HASH_PRIME * result + ackNumber.hashCode()
+        result = HASH_PRIME * result + syn.hashCode()
+        result = HASH_PRIME * result + ack.hashCode()
+        result = HASH_PRIME * result + fin.hashCode()
+        result = HASH_PRIME * result + rst.hashCode()
+        result = HASH_PRIME * result + payload.contentHashCode()
+        return result
+    }
+}
 
 sealed interface TcpAction {
     data class SendSegment(val segment: TcpSegmentToSend) : TcpAction
-    data class DeliverToDestination(val payload: ByteArray) : TcpAction
+
+    // Same ByteArray-content-equality override as TcpSegmentToSend/Ipv4TcpSegment above.
+    data class DeliverToDestination(val payload: ByteArray) : TcpAction {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is DeliverToDestination) return false
+            return payload.contentEquals(other.payload)
+        }
+
+        override fun hashCode(): Int = payload.contentHashCode()
+    }
     object CloseDestinationSocket : TcpAction
     object ShutdownDestinationOutput : TcpAction
 }

@@ -127,6 +127,8 @@ class Ipv4TcpPacketTest {
         // bytes) + a 1-byte payload right after the real header.
         val packet = ByteArray(20 + 24 + 1)
         packet[0] = 0x45
+        packet[2] = 0 // total length high byte
+        packet[3] = (20 + 24 + 1).toByte() // total length low byte
         packet[9] = 6
         InetAddress.getByName("10.0.0.2").address.copyInto(packet, 12)
         InetAddress.getByName("93.184.216.34").address.copyInto(packet, 16)
@@ -147,5 +149,90 @@ class Ipv4TcpPacketTest {
         packet[32] = (4 shl 4).toByte() // data offset = 4 words = 16 bytes, below the 20-byte minimum
 
         assertNull(Ipv4TcpPacket.parse(packet))
+    }
+
+    @Test
+    fun `parse returns null when the IHL claims a header shorter than the 20-byte minimum`() {
+        // Hand-built so the TCP header is self-consistent at the (too-short) IHL's own offset, and
+        // padded to the overall 40-byte floor -- otherwise a coincidental misread or the unrelated
+        // overall-size guard could reject it for the wrong reason.
+        val packet = ByteArray(16 + 20 + 4)
+        packet[0] = 0x44 // version 4, IHL 4 words = 16 bytes, below the 20-byte minimum
+        packet[9] = 6 // protocol: TCP
+        val tcpStart = 16
+        packet[tcpStart + 12] = (5 shl 4).toByte() // data offset = 5 words = 20 bytes, no options
+        packet[tcpStart + 13] = 0x10 // ACK flag
+
+        assertNull(Ipv4TcpPacket.parse(packet))
+    }
+
+    @Test
+    fun `parse returns null for a packet with the more-fragments flag set`() {
+        val packet = Ipv4TcpPacket.build(segment(ack = true))
+        packet[6] = 0x20 // flags byte: MF bit set, fragment offset 0
+
+        assertNull(Ipv4TcpPacket.parse(packet))
+    }
+
+    @Test
+    fun `parse returns null for a non-initial fragment (nonzero fragment offset)`() {
+        val packet = Ipv4TcpPacket.build(segment(ack = true))
+        packet[6] = 0x00
+        packet[7] = 0x01 // fragment offset = 1 (in 8-byte units), not the first fragment
+
+        assertNull(Ipv4TcpPacket.parse(packet))
+    }
+
+    @Test
+    fun `parse ignores trailing bytes past the IPv4 total-length field`() {
+        val original = segment(ack = true, payload = byteArrayOf(1, 2, 3))
+        val packet = Ipv4TcpPacket.build(original) + byteArrayOf(9, 9, 9, 9, 9)
+
+        val parsed = Ipv4TcpPacket.parse(packet)
+
+        requireNotNull(parsed)
+        assertArrayEquals(original.payload, parsed.payload)
+    }
+
+    @Test
+    fun `parse returns null when the total-length field claims more bytes than are present`() {
+        val packet = Ipv4TcpPacket.build(segment(ack = true, payload = byteArrayOf(1, 2, 3)))
+        packet[2] = 0x7F // total length high byte: claim an implausibly large total length
+        packet[3] = 0xFF.toByte()
+
+        assertNull(Ipv4TcpPacket.parse(packet))
+    }
+
+    @Test
+    fun `Ipv4TcpSegment instances with equal-content but distinct payload arrays are equal`() {
+        val first = segment(ack = true, payload = byteArrayOf(1, 2, 3))
+        val second = segment(ack = true, payload = byteArrayOf(1, 2, 3))
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
+
+    @Test
+    fun `build computes the exact TCP checksum value, independently verified`() {
+        // Independently computed in Python (a separate RFC 1071 implementation, not this file's own
+        // algorithm) for this exact segment's fields -- unlike the two checksum-verifies-to-zero
+        // tests above, which recompute the same pseudo-header algorithm the implementation uses and
+        // so can't catch a shared misunderstanding of the algorithm. Known value: 0x7C3F (flags are
+        // ACK + PSH, since segment()'s helper sets psh=true for any non-empty payload).
+        val packet = Ipv4TcpPacket.build(segment(ack = true, payload = byteArrayOf(9, 9, 9)))
+        val tcpChecksumOffset = 20 + 16
+
+        val checksum = ((packet[tcpChecksumOffset].toInt() and 0xFF) shl 8) or
+            (packet[tcpChecksumOffset + 1].toInt() and 0xFF)
+
+        assertEquals(0x7C3F, checksum)
+    }
+
+    @Test
+    fun `Ipv4TcpSegment instances with different payload content are not equal`() {
+        val first = segment(ack = true, payload = byteArrayOf(1, 2, 3))
+        val second = segment(ack = true, payload = byteArrayOf(9, 9, 9))
+
+        assertFalse(first == second)
     }
 }
