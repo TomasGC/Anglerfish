@@ -1,6 +1,6 @@
 # Design Patterns - Anglerfish
 
-**Last Updated**: 2026-09-30
+**Last Updated**: 2026-10-02
 
 ---
 
@@ -225,3 +225,55 @@ with the packet being parsed — the spec's "never crash, always an ordinary fai
 requirement applies to those too, and one boundary at the point where `handle()`'s contract is
 actually promised is simpler and harder to miss than a try/catch inside each dependency's own
 real implementation.
+
+## Patterns In Use (added in issue #41)
+
+### Lock Around State Computation, I/O Outside the Lock
+
+`TcpRelay.transition { compute -> ... }` is the single path every call site uses to read, compute,
+and write `connection`: `synchronized(stateLock) { connection = compute(connection) }` happens
+first, and only the resulting actions (tun writes, the blocking socket write/shutdown) run outside
+the lock. The relay's own IO coroutine and the packet-handling caller both drive state from
+different threads; `@Volatile` alone made each individual read and write visible across threads
+but not the read-compute-write sequence atomic, so whichever thread finished last silently
+discarded the other's sequence/ack advance. Keeping I/O outside the lock means a slow blocking
+write never stalls the other thread's state transitions, only its own.
+
+### Object Split Purely to Stay Under a Detekt Threshold
+
+`TcpStateMachine` (public entry points) and `TcpTransitions` (file-private implementation) live in
+the same file with no real API boundary between them — the split exists solely because the
+combined logic needed 14-15 functions and this project's detekt config caps `TooManyFunctions` at
+11. Splitting by "one function per real-world event" vs. "per-state transition detail" keeps the
+file readable as a size split, not an architectural one; a future rule change could re-merge them
+without consequence.
+
+### Conditional Removal Guards an `onClosed` Race
+
+`SessionTable<T>.remove(key, expected: T): Boolean` only deletes an entry if the stored value is
+still the exact instance (`!==`) passed in. Both `UdpRelay` and `TcpRelay` fire their `onClosed`
+callback through this overload instead of a bare `remove(key)`, so a relay that dies after
+`NatRelay` has already installed its replacement under the same key (a fresh SYN for a 5-tuple
+whose old connection just failed) can't delete the wrong, newer entry. The invariant is enforced at
+the one call site that can check it, not left as a rule every caller has to remember.
+
+### Window-Paced Backpressure Without Retransmission
+
+`TcpRelay.relayFromDestination` throttles how fast it reads from the real destination socket to
+what the app's advertised TCP receive window actually allows (`TcpConnection.appAckNumber`/
+`appWindow`, refreshed from every ACKed segment), polling and retrying rather than reading ahead.
+This is deliberately *pacing*, not *reliability*: the relay still has no retransmission of its own
+(per the original spec's "no retransmission timers" decision), so it still cannot recover data the
+app's kernel actually drops — it only avoids being the thing that force-feeds data faster than the
+app said it could take, which was turning every transfer larger than one window into a permanent
+stall rather than an occasional loss.
+
+### Idempotent `close()` via `AtomicBoolean`, Not a Nullability Check
+
+Both `UdpRelay.close()` and `TcpRelay.close()` guard their body with
+`if (!closed.compareAndSet(false, true)) return` rather than checking whether a socket/job field is
+already null. A failed `send()`/`write()` on the caller's thread and the relay's own IO coroutine's
+failure path can both reach `close()` for the same relay at the same time; `compareAndSet` makes
+exactly one of them win the single call to `onClosed()`, so a losing racer's `SessionTable.remove`
+can never fire for a key a replacement relay may already occupy — this is what the conditional
+`remove(key, expected)` above also protects against from the other direction.

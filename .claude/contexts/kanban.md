@@ -4,6 +4,54 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-10-02 - [#41] TCP/UDP NAT relay engine
+- Standalone, fully-testable-at-the-logic-layer NAT/relay engine (`app.anglerfish.nat`): given a
+  raw IPv4 packet, dispatches it by 5-tuple to a per-flow `UdpRelay` or `TcpRelay` over a real
+  protected socket, translating addresses/ports back and forth. Nothing wired into the live
+  `AnglerfishVpnService` tunnel — same explicit scope boundary as #38/#39/#40, since per-app
+  `BlockMode` dispatch between the DNS-only ad-filter path and this full relay is #42's job.
+  Built UDP first (simpler, proves the shared `SessionTable`/NAT-translation infrastructure) before
+  TCP's handshake/sequence-tracking state machine, per the approved design
+- `SessionTable<T>` (generic, injected-clock `FlowKey -> T` store), `Ipv4TcpPacket` (pure,
+  hand-rolled parse/build with mandatory checksum, mirrors #40's `Ipv4UdpPacket`), a pure
+  `TcpStateMachine`/`TcpTransitions` object pair (split across two objects purely to stay under
+  detekt's function-count threshold) driving a thin, untested `TcpRelay` glue class that owns a
+  real `Socket`; `UdpRelay`/`NatRelay` complete the UDP side and the dispatcher
+- Fresh-reviewer final review (Opus) on the full branch found 4 Critical and 9 Important findings,
+  all fixed in one pass: evicted sessions were never actually closed (`SessionTable.evictIdle` now
+  returns the evicted *values*, not just keys, so a caller can close what it removed); the
+  synthesized SYN-ACK was sent before the real socket connected, silently dropping the app's first
+  real bytes on nearly every connection (moved to after a successful `connect()`, with a proper
+  RST-ACK reply on connect failure); `TcpConnection` was read-modified-written from two threads
+  with only `@Volatile`, silently losing sequence/ack updates under bidirectional traffic (fixed
+  with a lock around state computation, I/O performed outside it); data from the destination was
+  pushed into the tunnel with no regard for the app's advertised receive window, permanently
+  stalling any transfer larger than that window (fixed with window-paced backpressure, tracked via
+  new `appAckNumber`/`appWindow` fields refreshed from every ACKed segment). Also fixed: 32-bit
+  sequence-number wraparound (never masked), a FIN bypassing the duplicate/out-of-order check and
+  corrupting state, an incomplete teardown model (replaced with proper `CLOSE_WAIT`/`LAST_ACK` half
+  close, the FIN now correctly consuming a sequence number), a stale/dead session table entry
+  silently absorbing a fresh SYN, `close()` racing an in-progress connect and a session's `onClosed`
+  callback deleting the wrong (replacement) entry, failure paths not sending a RST and a real read
+  error being mistaken for a clean close, and unhandled exceptions able to escape the shared
+  packet-dispatch loop or either relay's IO coroutine
+- One Important finding (a blocking socket write running on whatever thread calls `TcpRelay.handle`,
+  which a future shared drain thread would call from) deliberately deferred to #42 as a Ruling —
+  not exploitable with zero live callers today, and the right fix (a bounded per-relay write queue)
+  depends on #42's actual drain-loop threading model, which doesn't exist yet; same reasoning
+  already used to defer `DnsResolverProvider`'s network-discovery mechanism and `isBlocked()`
+  caching from #39/#40 into #42
+- 41 new tests (144 total, up from 103): 3 `FlowKeyTest`, 8 `Ipv4TcpPacketTest`,
+  7 `SessionTableTest`, 23 `TcpStateMachineTest`. `UdpRelay`/`TcpRelay`/`NatRelay`/`TunWriter` stay
+  untested real-socket glue, same treatment as `InstalledAppsProvider`/`AnglerfishVpnService`
+- Design spec: `.claude/sessions/specs/2026-10-02-nat-relay-engine-design.md`; plan:
+  `.claude/sessions/plans/2026-10-02-nat-relay-engine.md`
+tags: #nat #tcp #udp #networking #review
+Ref: https://github.com/TomasGC/Anglerfish/issues/41
+Commits: 132ab8f, 4cb0b63, 8f83a0b, abd88e5, 21c7cc2, ed75d12
+
+---
+
 2026-10-02 - [#40] DNS interception and resolution layer
 - Standalone, fully testable DNS-interception component (`app.anglerfish.dns`): given a raw IPv4
   UDP packet, decides whether to synthesize an NXDOMAIN reply (domain on #39's blocklist) or
