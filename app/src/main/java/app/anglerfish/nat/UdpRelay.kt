@@ -7,7 +7,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -52,7 +51,7 @@ class UdpRelay(
         onClosed()
     }
 
-    private suspend fun relayLoop() {
+    private fun relayLoop() {
         try {
             relayLoopBody()
         } catch (e: CancellationException) {
@@ -62,15 +61,15 @@ class UdpRelay(
         }
     }
 
-    private suspend fun relayLoopBody() {
+    // relayLoop (the caller) already runs on Dispatchers.IO, so the blocking receive() below needs
+    // no further dispatcher switch.
+    private fun relayLoopBody() {
         val buffer = ByteArray(MAX_UDP_PACKET_SIZE)
         while (!closed.get()) {
             val length = try {
-                withContext(Dispatchers.IO) {
-                    val packet = DatagramPacket(buffer, buffer.size)
-                    socket.receive(packet)
-                    packet.length
-                }
+                val packet = DatagramPacket(buffer, buffer.size)
+                socket.receive(packet)
+                packet.length
             } catch (_: IOException) {
                 close()
                 return

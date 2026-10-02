@@ -213,6 +213,22 @@ class Ipv4TcpPacketTest {
     }
 
     @Test
+    fun `build computes the exact TCP checksum value, independently verified`() {
+        // Independently computed in Python (a separate RFC 1071 implementation, not this file's own
+        // algorithm) for this exact segment's fields -- unlike the two checksum-verifies-to-zero
+        // tests above, which recompute the same pseudo-header algorithm the implementation uses and
+        // so can't catch a shared misunderstanding of the algorithm. Known value: 0x7C3F (flags are
+        // ACK + PSH, since segment()'s helper sets psh=true for any non-empty payload).
+        val packet = Ipv4TcpPacket.build(segment(ack = true, payload = byteArrayOf(9, 9, 9)))
+        val tcpChecksumOffset = 20 + 16
+
+        val checksum = ((packet[tcpChecksumOffset].toInt() and 0xFF) shl 8) or
+            (packet[tcpChecksumOffset + 1].toInt() and 0xFF)
+
+        assertEquals(0x7C3F, checksum)
+    }
+
+    @Test
     fun `Ipv4TcpSegment instances with different payload content are not equal`() {
         val first = segment(ack = true, payload = byteArrayOf(1, 2, 3))
         val second = segment(ack = true, payload = byteArrayOf(9, 9, 9))

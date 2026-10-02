@@ -1,8 +1,8 @@
 package app.anglerfish.nat
 
 // Generic over the relay type each protocol stores (UdpRelay, TcpRelay) so this stays pure and
-// protocol-agnostic. Time is always an injected parameter, never read internally -- eviction must
-// stay deterministically testable, a gap a prior issue's review flagged when it wasn't done.
+// protocol-agnostic. Time is always an injected parameter, never read internally, so eviction can
+// be tested deterministically without real clock delays.
 class SessionTable<T> {
     private data class Entry<T>(val value: T, var lastActivityMillis: Long)
 
