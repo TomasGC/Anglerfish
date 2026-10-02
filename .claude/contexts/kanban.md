@@ -4,6 +4,54 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-10-02 - [#40] DNS interception and resolution layer
+- Standalone, fully testable DNS-interception component (`app.anglerfish.dns`): given a raw IPv4
+  UDP packet, decides whether to synthesize an NXDOMAIN reply (domain on #39's blocklist) or
+  forward the query to the device's real configured resolver and relay the answer back. Nothing
+  wired into the live `AnglerfishVpnService` tunnel — explicit scope boundary matching #38/#39,
+  since per-app `BlockMode` gating needs #38's data model and is #42's job
+- `Ipv4UdpPacket` (pure, hand-rolled): parses/builds the IPv4/UDP envelope — fixed-size headers,
+  no variable-length encoding, so no library justified. `DnsMessages` (pure, new `dnsjava`
+  dependency): wraps DNS wire-format parsing/NXDOMAIN building — hand-rolling domain-name
+  decompression is a well-known source of real bugs (compression-pointer loops are a classic CVE
+  class), and `dnsjava` being pure JVM means this logic is plain-JUnit-testable with zero
+  Android/Robolectric dependency
+- `DnsForwarder`/`DnsResolverProvider` (interfaces + thin real impls, untested glue, same
+  treatment as `InstalledAppsProvider`): forwarding socket calls `VpnService.protect()` before
+  sending (the standard footgun — an unprotected socket's own packets re-enter the tunnel they're
+  escaping) and `connect()`s to the resolver before `receive()` (rejects a reply from any other
+  source, since an unconnected socket otherwise accepts the first datagram from anywhere on that
+  ephemeral port)
+- `DnsInterceptor` orchestrates all of the above behind one `suspend fun handle(raw): ByteArray?`
+  — forwarding always targets the device's configured resolver regardless of the packet's own
+  destination (so an app hardcoding its own DNS server can't bypass filtering), while the
+  *response* packet's source address is the original packet's destination (what the app itself
+  addressed), never the real resolver's address
+- Fresh-reviewer final review (Opus) caught 1 Critical and 6 Important findings. Critical (missing
+  `ACCESS_NETWORK_STATE` crashing every tunnel activation) traced back to a `setUnderlyingNetworks()`
+  call added to existing #5 code during this issue's own Task 3 — removed entirely rather than
+  patched, since `VpnService` exposes no way to read that value back anyway (the call achieved
+  nothing for a future caller while also regressing live Wi-Fi/cellular handoff tracking), which
+  reverted `AnglerfishVpnService.buildTunnel()` to its already-verified #5 shape with no new
+  manual on-device testing needed. Other fixes: exceptions from `BlocklistRepository`/
+  `DnsResolverProvider` no longer escape `handle()` (DataStore/`ConnectivityManager` failures now
+  collapse to the documented `null`, not a crash); the forwarding-socket spoofing gap above;
+  several Review-Focus test gaps (NXDOMAIN response shape, passthrough paths never invoking the
+  forwarder, forwarded-path envelope assertions) closed with real test coverage rather than
+  deferred
+- `lintDebug` added to this issue's own verification loop after the review caught a manifest
+  permission gap `detekt` alone doesn't check — same gap #39's review caught, now two-for-two on
+  "detekt-only isn't CI-equivalent"
+- 23 new tests (103 total, up from 80): 9 `Ipv4UdpPacketTest`, 4 `DnsMessagesTest`,
+  10 `DnsInterceptorTest`
+- Design spec: `.claude/sessions/specs/2026-10-02-dns-interception-design.md`; plan:
+  `.claude/sessions/plans/2026-10-02-dns-interception.md`
+tags: #vpn #dns #networking #review
+Ref: https://github.com/TomasGC/Anglerfish/issues/40
+Commits: 3ab639b, 15d99bc, 703b9ee, 053a55a
+
+---
+
 2026-10-01 - [#39] Ad-domain blocklist: remote refresh, user additions
 - Two-layer blocklist (24h-refreshed remote cache + user additions), merged additions-only with no
   precedence conflicts — the data layer issue #40's DNS interception will consume. No new Gradle

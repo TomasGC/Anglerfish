@@ -12,8 +12,14 @@
 | Unit (`ui/`) | 23 + 5 | JUnit + kotlinx-coroutines-test | `AppListViewModelTest` against `FakeAppRepository`/`FakeVpnGateway` — empty-selection guard, consent-needed branch, activate/deactivate, auto-restart and auto-stop on selection change, tunnel reconciliation on construction when persisted state is active, search-query filtering (match, clear, selection while filtered, filters within all three buckets), layout toggling (reflected in uiState, persisted, reversible, respects the active search filter), hide/unhide bucket placement and its VPN-restart interaction (stops when it was the last selection, restarts with the remaining selection, no-ops when hiding a not-selected app, ignores a stale active flag read before its own state change); `BlocklistViewModelTest` against a `FakeBlocklistRepository` — add/remove pass-through, blank-input guard, trim + lowercase normalization |
 | Contract (`data/`) | 6 | JUnit + kotlinx-coroutines-test | `AppRepositoryContractTest` (abstract, 3 assertions: default mode on select, `setMode` unhides, hiding deselects) run against both `FakeAppRepositoryContractTest` and `DataStoreAppRepositoryContractTest` — guarantees `FakeAppRepository` (used throughout `AppListViewModelTest`) can't silently drift from `DataStoreAppRepository`'s real behavior the way it did twice in one session while building per-app `BlockMode`. No `ViewModel`, no `Dispatchers.Main` substitution — direct `runTest {}` + suspend calls, same proven pattern as `DataStoreAppRepositoryTest` |
 | Repository (`data/`) | 11 | JUnit + kotlinx-coroutines-test | `DataStoreBlocklistRepositoryTest` — merges remote-cache/user-addition layers (no bundled layer — see below), returns false for everything before any fetch has ever happened, `refreshIfStale`'s interval/success/failure/empty-parse-rejection branches via a `FakeBlocklistFetcher` |
+| Unit (`dns/`) | 9 + 4 + 10 | JUnit + kotlinx-coroutines-test | `Ipv4UdpPacketTest` (pure: IPv4/UDP envelope parse/build round-trip, checksum verification, rejects non-IPv4/non-UDP/truncated/length-inconsistent packets, accepts a header with IP options present), `DnsMessagesTest` (pure, `dnsjava`-backed: parses a well-formed query, rejects garbage, builds an NXDOMAIN response matching the query's transaction ID with the QR flag set and the question echoed), `DnsInterceptorTest` against fakes of `BlocklistRepository`/`DnsForwarder`/`DnsResolverProvider` — blocked-domain NXDOMAIN path (full envelope swap), forwarded-and-relayed path (full envelope swap), forward-timeout path, empty-resolver-list path (forwarder never invoked), non-DNS/non-IPv4/TCP/malformed passthrough (forwarder never invoked on any of them), and a thrown exception from either the blocklist or resolver dependency returning `null` instead of propagating |
 | Manual (`vpn/`) | 8 scenarios | On-device checklist | `docs/manual-testing.md` — first-run consent, activate/deactivate, notification deactivate action, empty-selection guard, live restart, unselect-last-app auto-stop, process-death recovery (soft kill + hard kill + reconciliation), establish() failure path |
-| **Total automated** | **80** | | |
+| **Total automated** | **103** | | |
+
+**`DnsInterceptor` is not wired into the live tunnel**: issue #40 built it as a standalone,
+fully-tested component (`app.anglerfish.dns`) — `AnglerfishVpnService.drain()` still discards every
+packet, unchanged. Wiring it in, with per-app `BlockMode` gating, is #42's job. See
+`contexts/design-patterns.md`'s #40 entries for why.
 
 **No bundled blocklist asset**: the original design bundled a snapshot of the full StevenBlack/hosts
 list as an app asset so first-launch-before-any-fetch still blocked something. That 2.2MB asset
@@ -22,12 +28,15 @@ than trimmed, since `AnglerfishApplication.onCreate()` already calls `refreshIfS
 unconditionally and `lastFetch` defaults to 0, so first launch always starts a real fetch
 immediately. See `contexts/design-patterns.md`'s "No Bundled Snapshot" entry.
 
-**Known deferred performance item (flagged for issue #40)**: `DataStoreBlocklistRepository.isBlocked`
-re-parses the cached remote text and rebuilds the full bundled+remote+additions union on every
-call — harmless today since nothing calls it live (#39's own scope explicitly ends before any
-consumer exists), but #40's DNS interception layer will call it per query. The right caching
-strategy (a `StateFlow`-backed merged set, invalidated on DataStore change) was deliberately left
-for #40 to design alongside its actual call pattern, not guessed at here.
+**Known deferred performance item (flagged for issue #39, re-deferred to #42)**:
+`DataStoreBlocklistRepository.isBlocked` re-parses the cached remote text and rebuilds the full
+remote+additions union on every call — still harmless today, since issue #40's `DnsInterceptor`
+calls `BlocklistRepository.isBlocked` (an interface, injected via a fake in its own tests) but
+isn't wired into any live caller yet, same deliberate scope boundary as #38 and #39. #42, which
+wires `DnsInterceptor` into the live `AnglerfishVpnService` tunnel, is now the issue that actually
+turns this into a per-DNS-query cost. The right caching strategy (a `StateFlow`-backed merged set,
+invalidated on DataStore change) stays deferred to #42, to design alongside its real call pattern
+(per-query vs. batched) rather than guessed at speculatively here.
 
 `InstalledAppsProvider` (the `PackageManager` glue) and the Compose UI (`AppListScreen`,
 `MainActivity`) are not unit tested — they have no branching logic of their own once the pure

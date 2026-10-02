@@ -176,3 +176,52 @@ block that adds it to `HIDDEN_PACKAGES_KEY`, so the two fields can never be read
 inconsistent state by any observer of `state: Flow<BlockingState>`. Same shape as "Repository as
 Single Source of Truth" above: the invariant lives at the one place that can enforce it atomically,
 not as a rule the ViewModel or UI have to remember to uphold on every call site.
+
+## Patterns In Use (added in issue #40)
+
+### A Pure-JVM Library for a Bug-Prone Wire Format
+
+`DnsMessages` wraps `dnsjava` (new dependency, BSD-2-Clause, pure Java, no native code) rather
+than hand-rolling DNS message parsing/building. Domain-name decompression in particular is a
+well-known source of real bugs — compression-pointer loops are a classic CVE class — unlike
+`Ipv4UdpPacket`'s hand-rolled envelope, which has fixed-size headers and no variable-length
+encoding and so carries none of that risk. Being pure JVM (no Android framework dependency) is a
+second win beyond correctness: `DnsMessagesTest` runs as plain JUnit, no Robolectric needed, same
+tier as `BlocklistParsingTest`.
+
+### Revert an Ill-Conceived Live-Code Addition Entirely, Don't Patch Around It
+
+A `Builder.setUnderlyingNetworks()` call was added to `AnglerfishVpnService.buildTunnel()` during
+this issue's own Task 3, intended to give a future `DnsResolverProvider` a network to query. The
+final review found it didn't work: `VpnService` exposes no way to read "the network I set as
+underlying" back out, so it gave a future caller nothing usable, while its side effects were
+actively harmful — pinning one `Network` stops the system's default tracking, so after a Wi-Fi to
+cellular handoff the VPN reports a disconnected network's capabilities until the next restart —
+and it required a new manifest permission for that zero benefit. The fix was deletion, not a
+smaller patch: removing the block reverted `buildTunnel()` to its already-verified #5 shape
+byte-for-byte, so no new on-device manual verification was needed at all. A half-fix (adding the
+permission, keeping the broken call) would have "resolved" the crash while leaving the handoff
+regression and the non-functional network-tracking mechanism in place.
+
+### `connect()` a Forwarding Socket Before `receive()`
+
+`UdpDnsForwarder`'s `DatagramSocket` calls `socket.connect(resolver, DNS_PORT)` before `send()`.
+An unconnected `DatagramSocket` accepts a reply from *any* source to that ephemeral port — the
+16-bit DNS transaction ID would be the only thing standing between a real resolver's answer and a
+spoofed one arriving first. `connect()` makes the kernel drop datagrams from any other address,
+closing that gap for the cost of one line — found by the final review, not written defensively up
+front, since the original design reasoned about `protect()` (needed to escape the tunnel) without
+separately reasoning about who's allowed to answer once escaped.
+
+### Exception Boundary at the Orchestrator, Not Every Leaf
+
+`DnsInterceptor.resolveResponse` wraps its whole body in one try/catch (rethrowing
+`CancellationException`, swallowing everything else to `null`), rather than each dependency call
+guarding itself. `Ipv4UdpPacket.parse` and `DnsMessages.parseQuery` already return `null` for
+malformed *input* — that's their own job. But `BlocklistRepository.isBlocked` (DataStore I/O) and
+`DnsResolverProvider.currentResolvers` (`ConnectivityManager`, which can throw `SecurityException`
+on a missing permission) are real dependencies with real failure modes that have nothing to do
+with the packet being parsed — the spec's "never crash, always an ordinary failed lookup"
+requirement applies to those too, and one boundary at the point where `handle()`'s contract is
+actually promised is simpler and harder to miss than a try/catch inside each dependency's own
+real implementation.
