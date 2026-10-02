@@ -202,4 +202,21 @@ class Ipv4TcpPacketTest {
 
         assertNull(Ipv4TcpPacket.parse(packet))
     }
+
+    @Test
+    fun `Ipv4TcpSegment instances with equal-content but distinct payload arrays are equal`() {
+        val first = segment(ack = true, payload = byteArrayOf(1, 2, 3))
+        val second = segment(ack = true, payload = byteArrayOf(1, 2, 3))
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
+
+    @Test
+    fun `Ipv4TcpSegment instances with different payload content are not equal`() {
+        val first = segment(ack = true, payload = byteArrayOf(1, 2, 3))
+        val second = segment(ack = true, payload = byteArrayOf(9, 9, 9))
+
+        assertFalse(first == second)
+    }
 }

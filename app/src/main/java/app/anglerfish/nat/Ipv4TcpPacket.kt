@@ -2,6 +2,9 @@ package app.anglerfish.nat
 
 import java.net.InetAddress
 
+// Overrides equals()/hashCode() because the generated versions compare `payload` by reference,
+// not content -- a real trap for anything that asserts equality on this type (hit once already,
+// see Ipv4TcpPacketTest's history).
 data class Ipv4TcpSegment(
     val sourceAddress: InetAddress,
     val sourcePort: Int,
@@ -16,7 +19,23 @@ data class Ipv4TcpSegment(
     val psh: Boolean,
     val windowSize: Int,
     val payload: ByteArray,
-)
+) {
+    // Grouping the non-array fields into one comparable list keeps this equals()/hashCode() pair's
+    // own cyclomatic complexity low -- a flat chain of 13 `&&`-joined field comparisons trips
+    // detekt's CyclomaticComplexMethod threshold.
+    private fun nonPayloadFields() = listOf(
+        sourceAddress, sourcePort, destAddress, destPort, sequenceNumber, ackNumber,
+        syn, ack, fin, rst, psh, windowSize,
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Ipv4TcpSegment) return false
+        return nonPayloadFields() == other.nonPayloadFields() && payload.contentEquals(other.payload)
+    }
+
+    override fun hashCode(): Int = HASH_PRIME * nonPayloadFields().hashCode() + payload.contentHashCode()
+}
 
 private const val IPV4_HEADER_LENGTH = 20
 private const val TCP_HEADER_LENGTH = 20
@@ -62,6 +81,7 @@ private const val PSEUDO_LENGTH_OFFSET = 10
 private const val FLAGS_FRAGMENT_OFFSET = 6
 private const val MORE_FRAGMENTS_FLAG = 0x2000
 private const val FRAGMENT_OFFSET_MASK = 0x1FFF
+private const val HASH_PRIME = 31
 
 // Mirrors Ipv4UdpPacket's shape (#40) but for TCP: hand-rolled envelope parsing/building, with a
 // mandatory checksum -- unlike UDP's optional 0, a receiving kernel TCP stack silently discards a
