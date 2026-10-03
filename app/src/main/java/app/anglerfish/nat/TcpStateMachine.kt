@@ -4,6 +4,10 @@ private const val SEQ_MOD_MASK = 0xFFFFFFFFL
 private const val DEFAULT_PEER_WINDOW = 65535
 private const val HASH_PRIME = 31
 
+// Shared by the SYN-ACK's advertised MSS and TcpRelay's destination-read buffer: if they disagreed,
+// the app would segment its own sends to one size while we pace our reads by another.
+internal const val TCP_MAX_SEGMENT_SIZE = 1400
+
 enum class TcpConnectionState { SYN_RECEIVED, ESTABLISHED, CLOSE_WAIT, LAST_ACK, FIN_WAIT, CLOSED }
 
 // appAckNumber/appWindow track what the app has told us about ITS receive side (the highest
@@ -30,6 +34,7 @@ data class TcpSegmentToSend(
     val ack: Boolean = false,
     val fin: Boolean = false,
     val rst: Boolean = false,
+    val mss: Int? = null,
     val payload: ByteArray = ByteArray(0),
 ) {
     override fun equals(other: Any?): Boolean {
@@ -41,6 +46,7 @@ data class TcpSegmentToSend(
             ack == other.ack &&
             fin == other.fin &&
             rst == other.rst &&
+            mss == other.mss &&
             payload.contentEquals(other.payload)
     }
 
@@ -51,6 +57,7 @@ data class TcpSegmentToSend(
         result = HASH_PRIME * result + ack.hashCode()
         result = HASH_PRIME * result + fin.hashCode()
         result = HASH_PRIME * result + rst.hashCode()
+        result = HASH_PRIME * result + mss.hashCode()
         result = HASH_PRIME * result + payload.contentHashCode()
         return result
     }
@@ -91,7 +98,8 @@ object TcpStateMachine {
             appAckNumber = initialSequenceNumber,
             appWindow = appWindow,
         )
-        val synAck = TcpTransitions.ackSegment(initialSequenceNumber, connection.ackNumber).copy(syn = true)
+        val synAck = TcpTransitions.ackSegment(initialSequenceNumber, connection.ackNumber)
+            .copy(syn = true, mss = TCP_MAX_SEGMENT_SIZE)
         return TcpTransitionResult(connection, listOf(TcpAction.SendSegment(synAck)))
     }
 

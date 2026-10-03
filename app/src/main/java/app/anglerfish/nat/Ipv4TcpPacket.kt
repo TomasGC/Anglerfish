@@ -18,6 +18,8 @@ data class Ipv4TcpSegment(
     val rst: Boolean,
     val psh: Boolean,
     val windowSize: Int,
+    // Outbound-only: parse never fills this, so it is always null on an inbound segment.
+    val mss: Int? = null,
     val payload: ByteArray,
 ) {
     // Grouping the non-array fields into one comparable list keeps this equals()/hashCode() pair's
@@ -25,7 +27,7 @@ data class Ipv4TcpSegment(
     // detekt's CyclomaticComplexMethod threshold.
     private fun nonPayloadFields() = listOf(
         sourceAddress, sourcePort, destAddress, destPort, sequenceNumber, ackNumber,
-        syn, ack, fin, rst, psh, windowSize,
+        syn, ack, fin, rst, psh, windowSize, mss,
     )
 
     override fun equals(other: Any?): Boolean {
@@ -39,6 +41,8 @@ data class Ipv4TcpSegment(
 
 private const val IPV4_HEADER_LENGTH = 20
 private const val TCP_HEADER_LENGTH = 20
+private const val MSS_OPTION_KIND = 2
+private const val MSS_OPTION_LENGTH = 4
 private const val PROTOCOL_TCP = 6
 private const val IPV4_VERSION = 4
 private const val BYTE_MASK = 0xFF
@@ -135,7 +139,8 @@ object Ipv4TcpPacket {
     }
 
     fun build(segment: Ipv4TcpSegment): ByteArray {
-        val totalLength = IPV4_HEADER_LENGTH + TCP_HEADER_LENGTH + segment.payload.size
+        val tcpHeaderLength = if (segment.mss != null) TCP_HEADER_LENGTH + MSS_OPTION_LENGTH else TCP_HEADER_LENGTH
+        val totalLength = IPV4_HEADER_LENGTH + tcpHeaderLength + segment.payload.size
         val packet = ByteArray(totalLength)
 
         packet[VERSION_IHL_OFFSET] = IPV4_VERSION_IHL_NO_OPTIONS.toByte()
@@ -147,8 +152,8 @@ object Ipv4TcpPacket {
         writeUInt16(packet, IPV4_CHECKSUM_OFFSET, ipv4HeaderChecksum(packet))
 
         val tcpStart = IPV4_HEADER_LENGTH
-        writeTcpHeader(packet, tcpStart, segment)
-        segment.payload.copyInto(packet, tcpStart + TCP_HEADER_LENGTH)
+        writeTcpHeader(packet, tcpStart, segment, tcpHeaderLength)
+        segment.payload.copyInto(packet, tcpStart + tcpHeaderLength)
         val tcpSegmentBytes = packet.copyOfRange(tcpStart, packet.size)
         val checksum = tcpChecksum(segment.sourceAddress, segment.destAddress, tcpSegmentBytes)
         writeUInt16(packet, tcpStart + TCP_CHECKSUM_OFFSET, checksum)
@@ -156,12 +161,12 @@ object Ipv4TcpPacket {
         return packet
     }
 
-    private fun writeTcpHeader(packet: ByteArray, tcpStart: Int, segment: Ipv4TcpSegment) {
+    private fun writeTcpHeader(packet: ByteArray, tcpStart: Int, segment: Ipv4TcpSegment, tcpHeaderLength: Int) {
         writeUInt16(packet, tcpStart, segment.sourcePort)
         writeUInt16(packet, tcpStart + 2, segment.destPort)
         writeUInt32(packet, tcpStart + TCP_SEQ_OFFSET, segment.sequenceNumber)
         writeUInt32(packet, tcpStart + TCP_ACK_OFFSET, segment.ackNumber)
-        packet[tcpStart + TCP_DATA_OFFSET_BYTE] = ((TCP_HEADER_LENGTH / WORDS_TO_BYTES) shl DATA_OFFSET_SHIFT).toByte()
+        packet[tcpStart + TCP_DATA_OFFSET_BYTE] = ((tcpHeaderLength / WORDS_TO_BYTES) shl DATA_OFFSET_SHIFT).toByte()
         var flags = 0
         if (segment.fin) flags = flags or FLAG_FIN
         if (segment.syn) flags = flags or FLAG_SYN
@@ -172,6 +177,12 @@ object Ipv4TcpPacket {
         writeUInt16(packet, tcpStart + TCP_WINDOW_OFFSET, segment.windowSize)
         writeUInt16(packet, tcpStart + TCP_CHECKSUM_OFFSET, 0)
         writeUInt16(packet, tcpStart + TCP_URGENT_POINTER_OFFSET, 0)
+        segment.mss?.let { mss ->
+            val optionStart = tcpStart + TCP_HEADER_LENGTH
+            packet[optionStart] = MSS_OPTION_KIND.toByte()
+            packet[optionStart + 1] = MSS_OPTION_LENGTH.toByte()
+            writeUInt16(packet, optionStart + 2, mss)
+        }
     }
 
     private fun tcpChecksum(sourceAddress: InetAddress, destAddress: InetAddress, tcpSegment: ByteArray): Int {
