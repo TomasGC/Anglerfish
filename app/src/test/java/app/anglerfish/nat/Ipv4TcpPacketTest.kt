@@ -15,6 +15,7 @@ class Ipv4TcpPacketTest {
         ack: Boolean = false,
         fin: Boolean = false,
         rst: Boolean = false,
+        mss: Int? = null,
         payload: ByteArray = ByteArray(0),
     ) = Ipv4TcpSegment(
         sourceAddress = InetAddress.getByName("10.0.0.2"),
@@ -29,6 +30,7 @@ class Ipv4TcpPacketTest {
         rst = rst,
         psh = payload.isNotEmpty(),
         windowSize = 65535,
+        mss = mss,
         payload = payload,
     )
 
@@ -234,5 +236,58 @@ class Ipv4TcpPacketTest {
         val second = segment(ack = true, payload = byteArrayOf(9, 9, 9))
 
         assertFalse(first == second)
+    }
+
+    @Test
+    fun `build with an MSS option writes kind 2 length 4 and a data offset of 6 words`() {
+        val packet = Ipv4TcpPacket.build(segment(syn = true, ack = true, mss = 1400))
+
+        assertEquals(44, packet.size)
+        assertEquals(6, (packet[20 + 12].toInt() and 0xFF) shr 4)
+        assertEquals(2, packet[20 + 20].toInt() and 0xFF)
+        assertEquals(4, packet[20 + 21].toInt() and 0xFF)
+        assertEquals(1400, ((packet[20 + 22].toInt() and 0xFF) shl 8) or (packet[20 + 23].toInt() and 0xFF))
+    }
+
+    @Test
+    fun `MSS-bearing segment with payload round-trips its payload through parse`() {
+        val original = segment(ack = true, mss = 1400, payload = byteArrayOf(1, 2, 3))
+
+        val parsed = Ipv4TcpPacket.parse(Ipv4TcpPacket.build(original))
+
+        requireNotNull(parsed)
+        assertArrayEquals(original.payload, parsed.payload)
+    }
+
+    @Test
+    fun `build with an MSS option produces a TCP checksum that verifies to zero over the pseudo-header`() {
+        val original = segment(syn = true, ack = true, mss = 1400, payload = byteArrayOf(9, 9, 9))
+        val packet = Ipv4TcpPacket.build(original)
+        val tcpPortion = packet.copyOfRange(20, packet.size)
+
+        val pseudoHeader = ByteArray(12 + tcpPortion.size + (tcpPortion.size % 2))
+        original.sourceAddress.address.copyInto(pseudoHeader, 0)
+        original.destAddress.address.copyInto(pseudoHeader, 4)
+        pseudoHeader[9] = 6
+        pseudoHeader[10] = ((tcpPortion.size shr 8) and 0xFF).toByte()
+        pseudoHeader[11] = (tcpPortion.size and 0xFF).toByte()
+        tcpPortion.copyInto(pseudoHeader, 12)
+
+        var sum = 0
+        var i = 0
+        while (i < pseudoHeader.size) {
+            sum += ((pseudoHeader[i].toInt() and 0xFF) shl 8) or (pseudoHeader[i + 1].toInt() and 0xFF)
+            i += 2
+        }
+        while (sum shr 16 != 0) {
+            sum = (sum and 0xFFFF) + (sum shr 16)
+        }
+
+        assertEquals(0xFFFF, sum)
+    }
+
+    @Test
+    fun `segments differing only in mss are not equal`() {
+        assertFalse(segment(ack = true, mss = 1400) == segment(ack = true, mss = null))
     }
 }

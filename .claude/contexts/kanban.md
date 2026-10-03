@@ -4,6 +4,16 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-10-03 - [#48] Advertise MSS in the synthesized SYN-ACK
+- `TcpStateMachine.onSyn` now advertises MSS 1400 (kind 2, len 4) in the SYN-ACK. The app was falling back to the RFC 1122 default of 536 bytes; both sides now use the same segment size
+- `TCP_MAX_SEGMENT_SIZE` (top-level, `TcpStateMachine.kt`) replaces `TcpRelay`'s companion constant, so the advertised MSS and the destination-read buffer can't drift
+- `Ipv4TcpSegment` and `TcpSegmentToSend` gain `mss: Int?` (outbound only); `build` sets data offset to 6 words when present
+- Tests: 4 new `Ipv4TcpPacketTest` (option bytes, round trip with payload, checksum over the options header, mss in equality), 1 assertion in `TcpStateMachineTest`; `Ipv4TcpPacketTest` 20, `TcpStateMachineTest` 26
+- Detekt `TooManyFunctions` (11 max on objects) forced inlining the option write rather than a helper; `Ipv4TcpPacket` stays at 10 functions
+tags: #nat #tcp #mss
+Ref: https://github.com/TomasGC/Anglerfish/issues/48
+Commit: 4bb9161
+
 2026-10-03 - [#50] Fix 5 deferred Minor findings from #41's final review
 - `Ipv4TcpPacket.parse` now rejects IP fragments (more-fragments flag or nonzero fragment offset),
   an IHL claiming a header shorter than the 20-byte minimum, and a total-length field claiming more

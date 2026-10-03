@@ -104,6 +104,7 @@ class TcpRelay(
             ack = toSend.ack,
             fin = toSend.fin,
             rst = toSend.rst,
+            mss = toSend.mss,
             psh = toSend.payload.isNotEmpty(),
             windowSize = DEFAULT_WINDOW_SIZE,
             payload = toSend.payload,
@@ -153,7 +154,7 @@ class TcpRelay(
     // gone for good and the flow stalls permanently. This only throttles; it does not resend
     // anything the app's window has already forced it to drop.
     private fun relayFromDestination(realSocket: Socket) {
-        val buffer = ByteArray(MAX_SEGMENT_SIZE)
+        val buffer = ByteArray(TCP_MAX_SEGMENT_SIZE)
         while (!closed.get()) {
             val current = connection
             val unacked = (current.sequenceNumber - current.appAckNumber) and SEQUENCE_MASK
@@ -180,7 +181,6 @@ class TcpRelay(
     private companion object {
         const val SEQUENCE_MASK = 0xFFFFFFFFL
         const val DEFAULT_WINDOW_SIZE = 65535
-        const val MAX_SEGMENT_SIZE = 1400
         const val CONNECT_TIMEOUT_MS = 10_000
         const val WINDOW_POLL_INTERVAL_MS = 50L
     }

@@ -49,6 +49,7 @@ class TcpStateMachineTest {
         val sent = (result.actions.single() as TcpAction.SendSegment).segment
         assertTrue(sent.syn)
         assertTrue(sent.ack)
+        assertEquals(TCP_MAX_SEGMENT_SIZE, sent.mss)
         assertEquals(5000L, sent.sequenceNumber)
         assertEquals(101L, sent.ackNumber)
     }
