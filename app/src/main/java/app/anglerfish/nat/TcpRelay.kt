@@ -27,7 +27,7 @@ class TcpRelay(
     private val tunWriter: TunWriter,
     private val scope: CoroutineScope,
     private val onClosed: () -> Unit,
-) {
+) : TcpSession {
     private val stateLock = Any()
     private val closed = AtomicBoolean(false)
 
@@ -39,19 +39,19 @@ class TcpRelay(
     private var pendingAppSequenceNumber = 0L
     private var pendingAppWindow = 0
 
-    fun isActive(): Boolean = connection.state != TcpConnectionState.CLOSED
+    override fun isActive(): Boolean = connection.state != TcpConnectionState.CLOSED
 
-    fun start(appSequenceNumber: Long, appWindow: Int) {
+    override fun start(appSequenceNumber: Long, appWindow: Int) {
         pendingAppSequenceNumber = appSequenceNumber
         pendingAppWindow = appWindow
         relayJob = scope.launch(Dispatchers.IO) { runRelay() }
     }
 
-    fun handle(segment: Ipv4TcpSegment) {
+    override fun handle(segment: Ipv4TcpSegment) {
         transition { TcpStateMachine.onSegment(it, segment) }
     }
 
-    fun close() {
+    override fun close() {
         if (!closed.compareAndSet(false, true)) return
         relayJob?.cancel()
         socket?.close()
