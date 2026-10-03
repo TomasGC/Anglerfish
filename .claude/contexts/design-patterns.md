@@ -277,3 +277,14 @@ failure path can both reach `close()` for the same relay at the same time; `comp
 exactly one of them win the single call to `onClosed()`, so a losing racer's `SessionTable.remove`
 can never fire for a key a replacement relay may already occupy — this is what the conditional
 `remove(key, expected)` above also protects against from the other direction.
+
+## Patterns In Use (added in issue #49)
+
+### Factory Seam at the Real-Socket Boundary
+
+`NatRelay` never constructs `UdpRelay`/`TcpRelay` itself. It asks a `SessionFactory`, and the
+production `RelaySessionFactory` holds the `VpnService`, `TunWriter` and `CoroutineScope` that real
+relays need. Tests pass a fake factory whose sessions only record `close()` and `start()`. The
+seam goes at the session interface rather than at the timeouts: a test that only asserts the
+timeout constants passes even when the two `evictIdle` calls are swapped. Keeping `VpnService` out
+of `NatRelay`'s constructor also means the test needs no Android types.
