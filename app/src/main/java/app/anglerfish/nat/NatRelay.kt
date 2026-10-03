@@ -1,10 +1,8 @@
 package app.anglerfish.nat
 
-import android.net.VpnService
 import app.anglerfish.dns.Ipv4UdpDatagram
 import app.anglerfish.dns.Ipv4UdpPacket
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 
 private const val UDP_IDLE_TIMEOUT_MS = 60_000L
 private const val TCP_IDLE_TIMEOUT_MS = 5 * 60_000L
@@ -18,12 +16,10 @@ private const val TCP_IDLE_TIMEOUT_MS = 5 * 60_000L
 // time (the eventual #42 tun-read loop) -- the get-then-create-then-put sequence in handleUdp/
 // handleTcp is not itself synchronized, and would race if called concurrently.
 class NatRelay(
-    private val vpnService: VpnService,
-    private val tunWriter: TunWriter,
-    private val scope: CoroutineScope,
+    private val sessions: SessionFactory,
 ) {
-    private val udpSessions = SessionTable<UdpRelay>()
-    private val tcpSessions = SessionTable<TcpRelay>()
+    private val udpSessions = SessionTable<UdpSession>()
+    private val tcpSessions = SessionTable<TcpSession>()
 
     fun handleOutgoingPacket(raw: ByteArray, now: Long) {
         try {
@@ -63,9 +59,9 @@ class NatRelay(
         relay.sendToDestination(datagram.payload)
     }
 
-    private fun createUdpRelay(key: FlowKey, now: Long): UdpRelay {
-        lateinit var relay: UdpRelay
-        relay = UdpRelay(vpnService, key.toEndpoints(), tunWriter, scope, onClosed = { udpSessions.remove(key, relay) })
+    private fun createUdpRelay(key: FlowKey, now: Long): UdpSession {
+        lateinit var relay: UdpSession
+        relay = sessions.createUdp(key.toEndpoints(), onClosed = { udpSessions.remove(key, relay) })
         udpSessions.put(key, relay, now)
         return relay
     }
@@ -96,8 +92,8 @@ class NatRelay(
     }
 
     private fun startTcpRelay(key: FlowKey, segment: Ipv4TcpSegment, now: Long) {
-        lateinit var relay: TcpRelay
-        relay = TcpRelay(vpnService, key.toEndpoints(), tunWriter, scope, onClosed = { tcpSessions.remove(key, relay) })
+        lateinit var relay: TcpSession
+        relay = sessions.createTcp(key.toEndpoints(), onClosed = { tcpSessions.remove(key, relay) })
         tcpSessions.put(key, relay, now)
         relay.start(segment.sequenceNumber, segment.windowSize)
     }

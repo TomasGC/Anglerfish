@@ -4,6 +4,16 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-10-03 - [#49] Verify NatRelay's per-protocol session timeouts
+- `NatRelay` takes a `SessionFactory` instead of building `UdpRelay`/`TcpRelay` directly. Production wiring is `RelaySessionFactory` (holds `VpnService`, `TunWriter`, `CoroutineScope`); `UdpRelay`/`TcpRelay` implement the new `UdpSession`/`TcpSession` interfaces, with no behavior change
+- `NatRelayTest` drives `handleOutgoingPacket` with a UDP datagram and a TCP SYN, then calls `evictIdle`: the UDP session closes at 60s and not at 59.999s, the TCP session outlives the UDP timeout and closes at 5 min and not at 5 min minus 1 ms. Fake sessions are nested in the test class
+- Option A (assert the timeout constants) rejected: it passes even if the two `evictIdle` calls are swapped
+- Tests: `NatRelayTest` 2 new; NAT suite and full unit suite, `detekt`, `lintDebug` pass
+- Push-CI on the branch passed, but several jobs are Raven-shaped (skipped shards, mock/instrumented tiers that run nothing). Tracked in #53, to rework with Condor later
+tags: #nat #tcp #testing #seam
+Ref: https://github.com/TomasGC/Anglerfish/issues/49
+Commit: fb10776
+
 2026-10-03 - [#48] Advertise MSS in the synthesized SYN-ACK
 - `TcpStateMachine.onSyn` now advertises MSS 1400 (kind 2, len 4) in the SYN-ACK. The app was falling back to the RFC 1122 default of 536 bytes; both sides now use the same segment size
 - `TCP_MAX_SEGMENT_SIZE` (top-level, `TcpStateMachine.kt`) replaces `TcpRelay`'s companion constant, so the advertised MSS and the destination-read buffer can't drift

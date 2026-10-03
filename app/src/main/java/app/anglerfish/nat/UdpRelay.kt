@@ -22,7 +22,7 @@ class UdpRelay(
     private val tunWriter: TunWriter,
     scope: CoroutineScope,
     private val onClosed: () -> Unit,
-) {
+) : UdpSession {
     private val closed = AtomicBoolean(false)
 
     private val socket = DatagramSocket().apply {
@@ -32,7 +32,7 @@ class UdpRelay(
 
     private val relayJob: Job = scope.launch(Dispatchers.IO) { relayLoop() }
 
-    fun sendToDestination(payload: ByteArray) {
+    override fun sendToDestination(payload: ByteArray) {
         try {
             socket.send(DatagramPacket(payload, payload.size))
         } catch (_: IOException) {
@@ -44,7 +44,7 @@ class UdpRelay(
     // thread) and the relay coroutine's own failure path could both call close(), each believing it
     // owns the single call to onClosed, and remove whatever entry NatRelay has installed under this
     // flow's key at that moment -- possibly a replacement relay created after this one died.
-    fun close() {
+    override fun close() {
         if (!closed.compareAndSet(false, true)) return
         relayJob.cancel()
         socket.close()
