@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Anglerfish"
 include(":app")
+include(":core")
+include(":app-instrumented")

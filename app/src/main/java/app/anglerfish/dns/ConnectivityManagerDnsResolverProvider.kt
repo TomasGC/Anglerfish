@@ -4,10 +4,6 @@ import android.net.ConnectivityManager
 import android.net.Network
 import java.net.InetAddress
 
-interface DnsResolverProvider {
-    fun currentResolvers(): List<InetAddress>
-}
-
 // underlyingNetwork is a supplier, not a fixed Network, so the caller can track network changes
 // (e.g. Wi-Fi to cellular) over the tunnel's lifetime. How that network is obtained -- and
 // whether it needs to differ from ConnectivityManager's own active network -- is #42's problem to

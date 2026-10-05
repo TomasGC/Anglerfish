@@ -4,13 +4,6 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-// Seam between DataStoreBlocklistRepository and the real network call, so refreshIfStale's
-// interval/success/failure logic is unit-testable without a live server (same pattern as
-// VpnGateway sitting between AppListViewModel and the real VpnController).
-interface BlocklistFetcher {
-    fun fetch(url: String): String?
-}
-
 class HttpBlocklistFetcher : BlocklistFetcher {
     override fun fetch(url: String): String? {
         var connection: HttpURLConnection? = null
