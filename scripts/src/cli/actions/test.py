@@ -1,12 +1,10 @@
 """Test action — run the Kotlin test suite.
 
-Anglerfish's app/build.gradle.kts has no -DtestType Gradle property filter (unlike Raven's,
-which splits unit/integration-mock/integration-real JVM tests by class-name suffix) — the
-app has exactly one JVM test tier today (plain app/src/test/, see contexts/tests.md). The
-unit/integration-mock/integration-real suite-selection CLI surface is kept so this interface
-doesn't need to change again once Anglerfish actually grows a second tier; until then, all
-three suites run the same untiered testDebugUnitTest task. Add the -DtestType filter to
-app/build.gradle.kts in a future issue if/when a second tier is introduced.
+The JVM suites are the Gradle test tasks of both JVM modules: :core (test, integrationMock,
+integrationReal — pure JVM, no Android) and :app (testDebugUnitTest — Android unit tests).
+`unit`, `integration-mock` and `integration-real` each select the whole JVM set, which runs once
+however many of them are named. `instrumented` runs connectedDebugAndroidTest on a device or
+emulator.
 """
 
 import os
@@ -18,6 +16,13 @@ from common.file_utils import get_project_root
 from common.subprocess_runner import SubprocessRunner
 
 SUITES = ["unit", "integration-mock", "integration-real", "instrumented"]
+JVM_SUITES = {"unit", "integration-mock", "integration-real"}
+JVM_TASKS = [
+    ":core:test",
+    ":core:integrationMock",
+    ":core:integrationReal",
+    ":app:testDebugUnitTest",
+]
 
 
 class TestAction:
@@ -33,21 +38,10 @@ class TestAction:
         self._gradle = gradle or GradleRunner(runner, self._project_root)
         self._adb = adb or AdbManager(runner)
 
-    def run_all_untiered(self) -> bool:
-        # The plain `test` command (no suite named) — this is the one that actually matters
-        # today. Single Gradle module, so :app's own testDebugUnitTest is the whole suite.
-        return self._gradle.run_task("testDebugUnitTest")
-
-    def run_unit(self) -> bool:
-        # No -DtestType filter exists yet — see module docstring. unit/integration-mock/
-        # integration-real all alias to the same untiered task until a second tier lands.
-        return self.run_all_untiered()
-
-    def run_integration_mock(self) -> bool:
-        return self.run_all_untiered()
-
-    def run_integration_real(self) -> bool:
-        return self.run_all_untiered()
+    def run_jvm_suites(self) -> bool:
+        # Every task runs even after a failure, so one run reports all failing tiers.
+        results = [self._gradle.run_task(task) for task in JVM_TASKS]
+        return all(results)
 
     def run_instrumented(self, device: str) -> bool:
         os.environ["ANDROID_SERIAL"] = device
@@ -60,20 +54,12 @@ class TestAction:
         suites = suites or []
 
         if not suites:
-            return 0 if self.run_all_untiered() else 1
+            return 0 if self.run_jvm_suites() else 1
 
         success = True
 
-        if "unit" in suites:
-            if not self.run_unit():
-                success = False
-
-        if "integration-mock" in suites:
-            if not self.run_integration_mock():
-                success = False
-
-        if "integration-real" in suites:
-            if not self.run_integration_real():
+        if JVM_SUITES.intersection(suites):
+            if not self.run_jvm_suites():
                 success = False
 
         if "instrumented" in suites:
