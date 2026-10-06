@@ -89,9 +89,7 @@ See `contexts/commands.md` for the full command reference.
 
 See `contexts/architecture.md` and `contexts/design-patterns.md` for full detail. Summary:
 
-- **Single Gradle module** (`:app`) — no multi-module split; the app is small enough that module
-  boundaries would be pure overhead (contrast with Raven's `:core`/solver-module split, which
-  exists to prevent a real circular dependency Anglerfish doesn't have).
+- **Three Gradle modules** (`:app`, `:core`, `:app-instrumented`) — see `contexts/architecture.md`.
 - **MVVM**: Compose UI → `AppListViewModel` (exposes `Flow<AppListUiState>` + one-shot
   `Flow<AppListEvent>`) → `AppRepository` (DataStore) / `VpnGateway` (VpnService).
 - **Dependency Injection**: manual, one `AppContainer` built in `AnglerfishApplication.onCreate()`
@@ -157,42 +155,6 @@ since none of those scale with app size the way Hilt/multi-module do.
 ---
 
 ## Project Structure
-
-### Directory Layout
-
-```
-Anglerfish/
-├── app/
-│   └── src/
-│       ├── main/
-│       │   ├── java/app/anglerfish/
-│       │   │   ├── AnglerfishApplication.kt
-│       │   │   ├── di/AppContainer.kt
-│       │   │   ├── data/                  # domain model, filtering, DataStore repository
-│       │   │   ├── vpn/                   # VpnGateway/VpnController/AnglerfishVpnService
-│       │   │   └── ui/                    # Compose screen, ViewModel, MainActivity
-│       │   └── res/
-│       └── test/java/app/anglerfish/      # unit tier only — see contexts/tests.md
-├── docs/
-│   └── manual-testing.md                  # on-device VpnService verification checklist
-└── .claude/
-    ├── CLAUDE.md                          # this file
-    ├── contexts/                          # living project docs (this @-included set)
-    └── sessions/{specs,plans}/            # point-in-time design specs and SDD plans
-```
-
----
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `app/src/main/java/app/anglerfish/vpn/AnglerfishVpnService.kt` | The black-hole tunnel mechanic |
-| `app/src/main/java/app/anglerfish/vpn/VpnGateway.kt` | Testability seam between ViewModel and VpnService |
-| `app/src/main/java/app/anglerfish/data/DataStoreAppRepository.kt` | Selected-app set + active flag persistence |
-| `app/src/main/java/app/anglerfish/ui/AppListViewModel.kt` | Activate/deactivate/toggle state logic |
-| `app/src/main/java/app/anglerfish/di/AppContainer.kt` | Manual DI, single registration point |
-| `docs/manual-testing.md` | VpnService on-device verification checklist |
 
 ---
 

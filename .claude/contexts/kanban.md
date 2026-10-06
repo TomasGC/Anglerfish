@@ -4,6 +4,17 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-10-05 - [#53] Split test tiers into Gradle source sets
+- `:core` JVM module holds the pure logic with `test`, `integrationMock` and `integrationReal` source sets; `:app` keeps the Android unit tests; `:app-instrumented` (`com.android.test`) runs the on-device `ActivationFlowTest`
+- Discovery-based Condor pipeline (Condor #2, #4, #5) failed at startup with zero jobs and no log: reverted in Condor #6; Anglerfish pins Condor `main` with `unit-job: true`
+- Instrumented test seeds the app selection through `AppContainer`: the CI emulator has no user-installed apps, so the app list had no checkboxes
+- Not done: CI runs `:app` unit tests only; the `:core` tiers are not in the pipeline yet. `manage.py test` runs all JVM tiers
+tags: #ci-cd #test-tiers #modules
+Ref: https://github.com/TomasGC/Anglerfish/issues/53
+Commits: 5bc3a0b
+
+---
+
 2026-10-03 - [#49] Verify NatRelay's per-protocol session timeouts
 - `NatRelay` takes a `SessionFactory` instead of building `UdpRelay`/`TcpRelay` directly. Production wiring is `RelaySessionFactory` (holds `VpnService`, `TunWriter`, `CoroutineScope`); `UdpRelay`/`TcpRelay` implement the new `UdpSession`/`TcpSession` interfaces, with no behavior change
 - `NatRelayTest` drives `handleOutgoingPacket` with a UDP datagram and a TCP SYN, then calls `evictIdle`: the UDP session closes at 60s and not at 59.999s, the TCP session outlives the UDP timeout and closes at 5 min and not at 5 min minus 1 ms. Fake sessions are nested in the test class

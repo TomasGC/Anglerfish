@@ -47,11 +47,32 @@ a deliberate, documented trade-off (see `contexts/tests.md`), not a coverage gap
 
 ## Module Structure
 
-Single Gradle module (`:app`) — no multi-module split. Raven's `:core`/solver-module structure
-exists specifically to prevent a real circular dependency (a solver module needs the `PuzzleModule`
-contract, `:app` needs to list every solver module). Anglerfish has no such cycle: one screen, one
-service, one repository, all in one module, organized by package (`data/`, `vpn/`, `ui/`, `di/`)
-instead.
+Three Gradle modules (#53): `:core` is a plain JVM library with the pure logic (repositories,
+parsing, DNS and NAT engines), so its tests run without Android. `:app` is the Android app: Compose
+UI, ViewModel, `VpnService`, DI and the PackageManager/ConnectivityManager glue. `:app-instrumented`
+is a `com.android.test` module that runs the on-device tests against `:app`. `:core` depends on nothing
+in `:app`, so there is no cycle and no solver-module split is needed.
+
+### Directory Layout
+
+```
+Anglerfish/
+├── app/src/
+│   ├── main/java/app/anglerfish/
+│   │   ├── AnglerfishApplication.kt
+│   │   ├── di/AppContainer.kt
+│   │   ├── data/                  # InstalledAppsProvider (PackageManager glue)
+│   │   ├── dns/                   # Android glue: ConnectivityManager resolver, UDP forwarder
+│   │   ├── vpn/                   # VpnGateway/VpnController/AnglerfishVpnService
+│   │   └── ui/                    # Compose screen, ViewModel, MainActivity
+│   └── test/java/app/anglerfish/  # Android unit tests — see contexts/tests.md
+├── core/src/
+│   ├── main/java/app/anglerfish/  # pure logic: data/, dns/, nat/
+│   ├── test/                      # unit tests
+│   ├── integrationMock/           # mocked-boundary tests
+│   └── integrationReal/           # real DataStore file I/O
+└── app-instrumented/src/main/java/app/anglerfish/e2e/  # on-device tests (ActivationFlowTest)
+```
 
 ---
 

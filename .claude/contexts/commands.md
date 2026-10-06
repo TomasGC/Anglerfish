@@ -15,10 +15,7 @@ every action is tested against.
 python scripts/manage.py build
 python scripts/manage.py build --no-install
 
-# Run the Kotlin test suite. No suite named = plain untiered testDebugUnitTest (the one that
-# matters today). unit/integration-mock/integration-real all alias to the same untiered task
-# until app/build.gradle.kts grows a -DtestType filter — the CLI surface exists now so it won't
-# need to change shape when that happens.
+# Run the Kotlin JVM suites: :core (test, integrationMock, integrationReal) and :app unit tests.
 python scripts/manage.py test
 python scripts/manage.py test unit
 python scripts/manage.py test instrumented
@@ -62,10 +59,11 @@ same as Raven's own copy.
 
 ## CI (GitHub Actions, via `TomasGC/condor`'s reusable workflows)
 
-- `push-ci.yml` — runs on push to `feature/**`/`bugfix/**`: `kotlin-pipeline` (validation,
-  lint-checks incl. Detekt/Android Lint/OSV dependency scan, unit-tests, integration-mock,
-  integration-real, build-apk, coverage, instrumented-tests on a Gradle Managed Device) and
-  `python-pipeline` (the `scripts/` test suite, skipped when nothing under `scripts/` changed).
+- `push-ci.yml` — runs on push to `feature/**`/`bugfix/**`. Kotlin: `validation` and `lint-checks` run in
+  parallel with `unit` (matrix: `:core:test`, `:app:testDebugUnitTest`). Then `integration-mock`
+  (`:core:integrationMock`), `integration-real` (`:core:integrationReal`), `build-apk` and `coverage`, and
+  `instrumented-tests` on a Gradle Managed Device. Each tier waits for the one before it. Python:
+  `python-pipeline` (skipped when nothing under `scripts/` changed).
 - `pr-ci.yml` — reports Push-CI's result back onto the PR once it completes.
 - `.osv-scanner.toml` — overrides for AGP/Gradle-internal build-tool transitive dependencies
   (netty, bouncycastle, commons-*, jose4j, freemarker, jdom2, the Kotlin Gradle plugin itself) —
