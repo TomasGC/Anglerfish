@@ -20,7 +20,9 @@ jobs:
       integration-mock-tasks: '[":core:integrationMock"]'
       integration-real-tasks: '[":core:integrationReal"]'
       instrumented-task: ":app-instrumented:connectedDebugAndroidTest"
-      coverage-threshold: 0
+      # #23: 90%, measured against testable code only -- see app/build.gradle.kts's koverReport
+      # exclude list and contexts/design-patterns.md for what's deliberately left out and why.
+      coverage-threshold: 90
 
   python-pipeline:
     uses: TomasGC/condor/.github/workflows/python-push-ci.yml@main

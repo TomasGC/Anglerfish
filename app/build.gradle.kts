@@ -84,9 +84,12 @@ detekt {
 }
 
 // Generates the XML report scripts/manage.py's coverage command reads (app/build/reports/kover/
-// reportDebug.xml). No verify{} threshold gate here on purpose — see issue #19's "Out of scope":
-// enforcing a minimum is a separate decision from wiring up the mechanism. manage.py's own
-// Python-side 80% check stays a soft report/warning until that decision is made.
+// reportDebug.xml). The threshold (issue #23) is measured against testable code only: the
+// excluded classes below are the ones contexts/design-patterns.md documents as deliberately
+// manual (VpnService.Builder, real PackageManager/socket/HTTP glue, Compose UI) or trivial
+// wiring (DI container, ViewModel factories, the Application class) -- none of it is meant to
+// be unit-tested, so it should not silently drag the gate down. manage.py's own Python-side 80%
+// check stays a soft report/warning, unaffected by this filter.
 dependencies {
     kover(project(":core"))
 }
@@ -103,7 +106,36 @@ koverReport {
                     "**.*Test*",
                     "android.*",
                     "androidx.*",
+                    // Compose UI -- manual, see contexts/tests.md
+                    "**.AppListScreenKt*",
+                    "**.BlocklistScreenKt*",
+                    "**.ComposableSingletons\$*",
+                    "**.MainActivity*",
+                    "**.Screen",
+                    // VpnService.Builder / real Context -- cannot be unit-tested, see contexts/architecture.md
+                    "**.AnglerfishVpnService*",
+                    "**.VpnController",
+                    "**.VpnConsentKt",
+                    // Real PackageManager/socket/HTTP glue -- untested, same treatment as the above
+                    "**.InstalledAppsProvider",
+                    "**.HttpBlocklistFetcher*",
+                    "**.UdpDnsForwarder*",
+                    "**.ConnectivityManagerDnsResolverProvider",
+                    "**.UdpRelay*",
+                    "**.TcpRelay*",
+                    "**.RelaySessionFactory",
+                    "**.TunWriter",
+                    // Trivial wiring -- no branching logic worth gating on
+                    "**.AppContainer*",
+                    "**.AnglerfishApplication*",
+                    "**.AppListViewModelFactory",
+                    "**.BlocklistViewModelFactory",
                 )
+            }
+        }
+        verify {
+            rule {
+                minBound(90)
             }
         }
     }
