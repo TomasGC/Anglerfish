@@ -87,6 +87,10 @@ detekt {
 // reportDebug.xml). No verify{} threshold gate here on purpose — see issue #19's "Out of scope":
 // enforcing a minimum is a separate decision from wiring up the mechanism. manage.py's own
 // Python-side 80% check stays a soft report/warning until that decision is made.
+dependencies {
+    kover(project(":core"))
+}
+
 koverReport {
     androidReports("debug") {
         filters {
