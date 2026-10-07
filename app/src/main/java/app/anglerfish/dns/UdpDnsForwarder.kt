@@ -8,10 +8,6 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 
-interface DnsForwarder {
-    suspend fun forward(resolvers: List<InetAddress>, query: ByteArray): ByteArray?
-}
-
 // protect() must run before the socket sends anything -- without it, this socket's own outbound
 // packets re-enter the tunnel they're trying to escape, an infinite loop. A fresh socket per call
 // (no persistent connection to leak or get wedged across a Wi-Fi/cellular handoff); resolvers are

@@ -42,19 +42,6 @@ android {
             isReturnDefaultValues = true
             isIncludeAndroidResources = true
         }
-        // Not the AVD instrumented tests actually run on (that's manually created via avdmanager
-        // in Condor's kotlin-instrumented-tests.yml) — this managed-device declaration exists only
-        // so `./gradlew pixel4api30Setup` is a real task, letting CI pre-download and cache the
-        // system image before creating that manual AVD.
-        managedDevices {
-            devices {
-                maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("pixel4api30").apply {
-                    device = "Pixel 4"
-                    apiLevel = 30
-                    systemImageSource = "aosp"
-                }
-            }
-        }
     }
 
     packaging {
@@ -67,6 +54,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core"))
     implementation(libs.core.ktx)
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.lifecycle.viewmodel.compose)
@@ -85,6 +73,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 }
 
 detekt {

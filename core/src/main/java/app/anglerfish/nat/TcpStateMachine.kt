@@ -6,7 +6,7 @@ private const val HASH_PRIME = 31
 
 // Shared by the SYN-ACK's advertised MSS and TcpRelay's destination-read buffer: if they disagreed,
 // the app would segment its own sends to one size while we pace our reads by another.
-internal const val TCP_MAX_SEGMENT_SIZE = 1400
+const val TCP_MAX_SEGMENT_SIZE = 1400
 
 enum class TcpConnectionState { SYN_RECEIVED, ESTABLISHED, CLOSE_WAIT, LAST_ACK, FIN_WAIT, CLOSED }
 

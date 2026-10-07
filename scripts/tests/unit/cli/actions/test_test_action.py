@@ -1,16 +1,17 @@
 """Tests for cli.actions.test.TestAction.
 
-Anglerfish has no -DtestType Gradle filter yet (unlike Raven — see module docstring on
-TestAction), so unit/integration-mock/integration-real all currently alias to the same
-untiered testDebugUnitTest task. These tests assert that dispatch behavior, not tier
-isolation, which doesn't exist yet.
+The JVM suites (unit, integration-mock, integration-real) each run the same JVM task set
+(JVM_TASKS: :core tiers + :app unit tests). Named together they run that set once.
 """
 
 from pathlib import Path
 from typing import Optional
 
+from cli.actions.test import JVM_TASKS
 from cli.actions.test import TestAction as ActionUnderTest
 from tests.helpers.fake_subprocess import FakeSubprocessRunner
+
+JVM_CALLS = [(task, 600, ()) for task in JVM_TASKS]
 
 
 class FakeGradleRunner:
@@ -61,9 +62,8 @@ def make_action(tmp_path: Path, gradle: FakeGradleRunner, adb: Optional[FakeAdbM
     )
 
 
-def test_run_with_no_suites_calls_run_all_untiered_not_individual_tiers(tmp_path: Path) -> None:
-    # Arrange — no-suites-given must call the single untiered testDebugUnitTest task
-    # directly, never loop each tier's own gradle task.
+def test_run_with_no_suites_runs_every_jvm_task_in_order(tmp_path: Path) -> None:
+    # Arrange — no-suites-given runs the full JVM set: both core tiers and the app unit tests.
     gradle = FakeGradleRunner(succeeds=True)
     action = make_action(tmp_path, gradle)
 
@@ -72,10 +72,10 @@ def test_run_with_no_suites_calls_run_all_untiered_not_individual_tiers(tmp_path
 
     # Assert
     assert exit_code == 0
-    assert gradle.calls == [("testDebugUnitTest", 600, ())]
+    assert gradle.calls == JVM_CALLS
 
 
-def test_run_with_none_suites_also_calls_run_all_untiered(tmp_path: Path) -> None:
+def test_run_with_none_suites_also_runs_every_jvm_task(tmp_path: Path) -> None:
     # Arrange
     gradle = FakeGradleRunner(succeeds=True)
     action = make_action(tmp_path, gradle)
@@ -85,10 +85,20 @@ def test_run_with_none_suites_also_calls_run_all_untiered(tmp_path: Path) -> Non
 
     # Assert
     assert exit_code == 0
-    assert gradle.calls == [("testDebugUnitTest", 600, ())]
+    assert gradle.calls == JVM_CALLS
 
 
-def test_run_all_untiered_failure_returns_nonzero(tmp_path: Path) -> None:
+def test_run_includes_core_tiers_and_app_unit_tests() -> None:
+    # Arrange / Act / Assert — the set itself: pure JVM tiers plus the Android unit task.
+    assert JVM_TASKS == [
+        ":core:test",
+        ":core:integrationMock",
+        ":core:integrationReal",
+        ":app:testDebugUnitTest",
+    ]
+
+
+def test_run_all_jvm_failure_returns_nonzero(tmp_path: Path) -> None:
     # Arrange
     gradle = FakeGradleRunner(succeeds=False)
     action = make_action(tmp_path, gradle)
@@ -101,7 +111,7 @@ def test_run_all_untiered_failure_returns_nonzero(tmp_path: Path) -> None:
 
 
 def test_run_dispatches_unit_suite(tmp_path: Path) -> None:
-    # Arrange — no -DtestType filter exists yet, so "unit" runs the same untiered task.
+    # Arrange
     gradle = FakeGradleRunner(succeeds=True)
     action = make_action(tmp_path, gradle)
 
@@ -110,7 +120,7 @@ def test_run_dispatches_unit_suite(tmp_path: Path) -> None:
 
     # Assert
     assert exit_code == 0
-    assert gradle.calls == [("testDebugUnitTest", 600, ())]
+    assert gradle.calls == JVM_CALLS
 
 
 def test_run_dispatches_integration_mock_suite(tmp_path: Path) -> None:
@@ -123,7 +133,7 @@ def test_run_dispatches_integration_mock_suite(tmp_path: Path) -> None:
 
     # Assert
     assert exit_code == 0
-    assert gradle.calls == [("testDebugUnitTest", 600, ())]
+    assert gradle.calls == JVM_CALLS
 
 
 def test_run_dispatches_integration_real_suite(tmp_path: Path) -> None:
@@ -136,7 +146,20 @@ def test_run_dispatches_integration_real_suite(tmp_path: Path) -> None:
 
     # Assert
     assert exit_code == 0
-    assert gradle.calls == [("testDebugUnitTest", 600, ())]
+    assert gradle.calls == JVM_CALLS
+
+
+def test_run_jvm_suites_named_together_run_the_set_once(tmp_path: Path) -> None:
+    # Arrange
+    gradle = FakeGradleRunner(succeeds=True)
+    action = make_action(tmp_path, gradle)
+
+    # Act
+    exit_code = action.run(suites=["unit", "integration-mock", "integration-real"])
+
+    # Assert — one pass over the JVM set, not one per named suite
+    assert exit_code == 0
+    assert gradle.calls == JVM_CALLS
 
 
 def test_run_dispatches_instrumented_suite_when_device_connected(tmp_path: Path) -> None:
@@ -212,11 +235,9 @@ def test_run_instrumented_suite_fails_cleanly_with_no_device(tmp_path: Path, cap
     assert gradle.calls == []
 
 
-def test_run_multiple_suites_runs_all_and_fails_if_any_fails(tmp_path: Path) -> None:
-    # Arrange — first requested suite succeeds, second fails: overall result must be
-    # failure, but every requested suite still runs (not short-circuited). unit and
-    # integration-mock currently alias to the identical gradle task (no -DtestType filter
-    # exists yet), so differentiate by call order instead of by task/args.
+def test_run_jvm_and_instrumented_runs_all_and_fails_if_any_fails(tmp_path: Path) -> None:
+    # Arrange — the first JVM task succeeds and the rest fail: overall result must be failure,
+    # and every JVM task still runs (not short-circuited after the first failure).
     class SequentialGradleRunner(FakeGradleRunner):
         def __init__(self) -> None:
             super().__init__(succeeds=True)
@@ -235,7 +256,7 @@ def test_run_multiple_suites_runs_all_and_fails_if_any_fails(tmp_path: Path) -> 
 
     # Assert
     assert exit_code == 1
-    assert len(gradle.calls) == 2
+    assert len(gradle.calls) == len(JVM_TASKS)
 
 
 def test_run_instrumented_sets_and_clears_android_serial_env_var(tmp_path: Path, monkeypatch) -> None:

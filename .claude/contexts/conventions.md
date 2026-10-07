@@ -57,13 +57,14 @@ app.anglerfish.di.*     # manual DI (AppContainer)
 ### Test Structure
 
 ```
-app/src/test/java/app/anglerfish/
-├── data/     # pure logic, JVM-only DataStore tests, and the Fake/real contract test
-└── ui/       # ViewModel tests against fakes, plus the shared FakeAppRepository fixture
+core/src/test/java/app/anglerfish/                    # pure JVM unit
+core/src/integrationMock/java/app/anglerfish/         # mocked-boundary integration
+core/src/integrationReal/java/app/anglerfish/         # real DataStore file I/O
+app/src/test/java/app/anglerfish/                     # Android unit: ui/ and data/ contract
+app-instrumented/src/main/java/app/anglerfish/e2e/    # on-device
 ```
 
-No Raven/Otter-style tier-suffix directory convention (`tests/unit/`, `tests/integration/mock/`)
-— Anglerfish's two automated categories are unit tests (`*Test.kt`) and one contract test
+Tiers are Gradle source sets, not name suffixes (see `contexts/tests.md`). Contract tests:
 (`AppRepositoryContractTest`, run via `FakeAppRepositoryContractTest`/
 `DataStoreAppRepositoryContractTest`) verifying `FakeAppRepository` matches
 `DataStoreAppRepository`'s real behavior. A `ViewModel`-plus-real-repository integration tier was
