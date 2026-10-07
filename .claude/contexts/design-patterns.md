@@ -69,20 +69,32 @@ sustained, unlike either busy-spinning on the syscall or giving up on the thread
 - **Hilt** — Raven and Otter both use Hilt; Anglerfish doesn't. One screen, one service, one
   repository is small enough that a hand-written `AppContainer` is less code and less build time
   than Hilt's codegen. Revisit only if the app's scope grows meaningfully beyond the MVP.
-- **Multi-module Gradle split** — Raven's `:core`/solver-module structure exists to prevent a
-  real circular dependency (solver modules need the contract, `:app` needs the solver modules).
-  Anglerfish has no such cycle: everything lives in `:app`, split into packages, not modules.
-- **Kover/Detekt coverage *threshold* gate** — Kover and Detekt are both wired in (issue #19:
-  `./gradlew koverXmlReportDebug detekt`, `python scripts/manage.py coverage`), but with no
-  `verify { rule { minBound(80) } }` block in `app/build.gradle.kts` and `coverage-threshold: 0`
-  in `push-ci.yml` — Gradle/CI never fail a build over a specific coverage percentage yet.
-  `CoverageAction`'s own Python-side 80% check is a soft report/warning only. Whether to add a
-  real hard gate (and at what threshold) is deferred until there's enough coverage for a number
-  to mean anything — raise `coverage-threshold` once that's true.
 - **Event bus between `AnglerfishVpnService` and `AppListViewModel`** — the service corrects
   `AppRepository` directly on failure instead of signaling the ViewModel through a separate
   channel (see "Repository as Single Source of Truth" above) — simpler, and the UI already
   observes the repository reactively.
+
+---
+
+## Patterns In Use (added in issue #23)
+
+### Coverage Threshold Measured Against Testable Code Only
+
+`app/build.gradle.kts`'s `koverReport` excludes classes that `contexts/architecture.md` and
+`contexts/tests.md` already document as deliberately untested — `VpnService.Builder`/real
+`Context` glue (`AnglerfishVpnService`, `VpnController`), real PackageManager/socket/HTTP glue
+(`InstalledAppsProvider`, `HttpBlocklistFetcher`, `UdpDnsForwarder`,
+`ConnectivityManagerDnsResolverProvider`, `UdpRelay`, `TcpRelay`, `RelaySessionFactory`,
+`TunWriter`), Compose UI (`AppListScreenKt`, `BlocklistScreenKt`, `MainActivity`), and trivial
+wiring (`AppContainer`, `AnglerfishApplication`, the ViewModel factories) — before computing the
+percentage, instead of gating on a number permanently depressed by code nothing was ever going
+to unit-test. Measured this way, Anglerfish was already at 96.9% (592/611 lines) the day the
+gate was added: `push-ci.yml`'s `coverage-threshold` is 90, with `verify { rule { minBound(90) } }`
+in `app/build.gradle.kts` as the Gradle-level enforcement, not just a CI-script check.
+`CoverageAction`'s own Python-side 80% check stays an unrelated soft warning. The real remaining
+gaps (a handful of lines each in `NatRelay`, `TcpStateMachine`, `DnsInterceptor`,
+`TcpTransitions`, `Ipv4UdpPacket`, plus two untested small UI state types) are small enough to
+close incrementally without the threshold blocking unrelated work today.
 
 ---
 
