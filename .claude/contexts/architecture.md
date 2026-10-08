@@ -92,6 +92,11 @@ Anglerfish/
   recents) or a full reboot both bypass it, leaving a tunnel-less "active" switch until the user
   reopens the app — which this reconciliation now covers unconditionally, without needing the
   user to manually toggle off and back on (see issue #25).
+- **`AnglerfishVpnService`'s drain loop dispatches by `BlockMode` instead of discarding
+  unconditionally** (#42) — `FullBlock` packets are still silently dropped, byte-for-byte the
+  same as before this issue; `AdFilterOnly` packets go to `DnsInterceptor` (DNS/port 53) or
+  `NatRelay` (everything else TCP/UDP), both built standalone in #40/#41 and wired in here for
+  the first time. See `.claude/sessions/specs/2026-10-07-blockmode-dispatch-design.md`.
 
 ---
 
