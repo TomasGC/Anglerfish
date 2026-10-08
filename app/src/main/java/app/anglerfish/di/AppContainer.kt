@@ -1,12 +1,15 @@
 package app.anglerfish.di
 
 import android.content.Context
+import android.net.ConnectivityManager
 import androidx.datastore.preferences.preferencesDataStore
 import app.anglerfish.data.AppRepository
 import app.anglerfish.data.BlocklistRepository
 import app.anglerfish.data.DataStoreAppRepository
 import app.anglerfish.data.DataStoreBlocklistRepository
 import app.anglerfish.data.InstalledAppsProvider
+import app.anglerfish.vpn.SdkGatedUidResolver
+import app.anglerfish.vpn.UidResolver
 import app.anglerfish.vpn.VpnController
 
 private val Context.dataStore by preferencesDataStore(name = "anglerfish_prefs")
@@ -26,5 +29,8 @@ class AppContainer(context: Context) {
     )
     val blocklistRepository: BlocklistRepository = DataStoreBlocklistRepository(
         dataStore = context.blocklistDataStore,
+    )
+    val uidResolver: UidResolver = SdkGatedUidResolver(
+        context.getSystemService(ConnectivityManager::class.java),
     )
 }
