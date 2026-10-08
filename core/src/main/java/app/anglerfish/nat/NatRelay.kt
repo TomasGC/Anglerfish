@@ -37,6 +37,15 @@ class NatRelay(
         tcpSessions.evictIdle(now, TCP_IDLE_TIMEOUT_MS).forEach { it.close() }
     }
 
+    // Final review (I3): teardownTunnel() must close every still-live relay, not just ones that
+    // have gone idle -- otherwise every protected socket and blocked IO thread (UdpRelay's
+    // receive(), TcpRelay's read()) leaks across a restart, and Dispatchers.IO's fixed 64-thread
+    // cap means enough leaked restarts eventually stall the whole tunnel.
+    fun closeAll() {
+        udpSessions.values().forEach { it.close() }
+        tcpSessions.values().forEach { it.close() }
+    }
+
     private fun dispatchOutgoingPacket(raw: ByteArray, now: Long) {
         val udpDatagram = Ipv4UdpPacket.parse(raw)
         if (udpDatagram != null) {

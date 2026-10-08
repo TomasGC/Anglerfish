@@ -19,6 +19,18 @@ class SessionTableTest {
         assertEquals("entry", table.get(key))
     }
 
+    // Final review (I3): NatRelay.closeAll() needs every live value, not just ones evictIdle()
+    // would currently remove.
+    @Test
+    fun `values returns every stored value`() {
+        val table = SessionTable<String>()
+        val other = FlowKey(TransportProtocol.TCP, InetAddress.getByName("10.0.0.2"), 3, InetAddress.getByName("8.8.8.8"), 4)
+        table.put(key, "a", now = 0L)
+        table.put(other, "b", now = 0L)
+
+        assertEquals(setOf("a", "b"), table.values().toSet())
+    }
+
     @Test
     fun `get on a missing key returns null`() {
         val table = SessionTable<String>()
