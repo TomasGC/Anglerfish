@@ -122,6 +122,23 @@ class DataStoreBlocklistRepositoryTest {
         assertEquals(false, repository.isBlocked("mytracker.example"))
     }
 
+    // Final review (I1): isBlocked caches the parsed remote list (re-parsing a multi-hundred-
+    // thousand-line hosts file on every single DNS query was the #39 deferral, now a live per-query
+    // cost under #42) -- this proves the cache still reflects a changed remote value on the SAME
+    // repository instance, not a stale snapshot from the first call.
+    @Test
+    fun `isBlocked reflects a remote cache change on a later call, not a stale cached parse`() = runTest {
+        val dataStore = createDataStore()
+        seedRemoteCache(dataStore, "0.0.0.0 first.example")
+        val repository = createRepository(dataStore = dataStore)
+        assertTrue(repository.isBlocked("first.example"))
+
+        seedRemoteCache(dataStore, "0.0.0.0 second.example")
+
+        assertEquals(false, repository.isBlocked("first.example"))
+        assertTrue(repository.isBlocked("second.example"))
+    }
+
     @Test
     fun `refreshIfStale fetches and caches on the very first call`() = runTest {
         val fetcher = FakeBlocklistFetcher("0.0.0.0 fetched.example")
