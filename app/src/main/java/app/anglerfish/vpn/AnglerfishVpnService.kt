@@ -43,16 +43,21 @@ class AnglerfishVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // A deliberate Stop tap, unlike onRevoke()/establish() failure, quits the whole app --
-        // single process (no android:process split), so this takes MainActivity down with it.
-        // Persisting inactive state before the kill matters doubly now: a stale "active" flag
-        // wouldn't just show a wrong switch, it would make AppListViewModel's launch-time
-        // reconciliation silently re-establish the tunnel the next time the app opens.
+        // #62: one action, one code path for both the notification's Stop button and the in-app
+        // switch (VpnController.stop()) -- they differ only in EXTRA_QUIT_APP. The notification's
+        // deliberate Stop tap quits the whole app (single process, no android:process split, so
+        // this takes MainActivity down with it) since the user is already outside the app; the
+        // in-app switch stays open, since the user is actively looking at it and only expects
+        // blocking to turn off, not the app to vanish. Persisting inactive state matters either
+        // way: a stale "active" flag wouldn't just show a wrong switch, it would make
+        // AppListViewModel's launch-time reconciliation silently re-establish the tunnel next time.
         if (intent?.action == ACTION_DEACTIVATE) {
             teardownTunnel()
             runBlocking { repository.setActive(false) }
             stopSelf()
-            Process.killProcess(Process.myPid())
+            if (intent.getBooleanExtra(EXTRA_QUIT_APP, false)) {
+                Process.killProcess(Process.myPid())
+            }
             return START_NOT_STICKY
         }
 
@@ -161,7 +166,9 @@ class AnglerfishVpnService : VpnService() {
         val deactivateIntent = PendingIntent.getService(
             this,
             0,
-            Intent(this, AnglerfishVpnService::class.java).setAction(ACTION_DEACTIVATE),
+            Intent(this, AnglerfishVpnService::class.java)
+                .setAction(ACTION_DEACTIVATE)
+                .putExtra(EXTRA_QUIT_APP, true),
             PendingIntent.FLAG_IMMUTABLE,
         )
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
@@ -177,6 +184,7 @@ class AnglerfishVpnService : VpnService() {
     companion object {
         const val EXTRA_SELECTED_PACKAGES = "app.anglerfish.vpn.EXTRA_SELECTED_PACKAGES"
         const val ACTION_DEACTIVATE = "app.anglerfish.vpn.ACTION_DEACTIVATE"
+        const val EXTRA_QUIT_APP = "app.anglerfish.vpn.EXTRA_QUIT_APP"
         private const val TUNNEL_ADDRESS = "10.0.0.2"
         private const val TUNNEL_PREFIX_LENGTH = 32
         private const val SESSION_NAME = "Anglerfish"
