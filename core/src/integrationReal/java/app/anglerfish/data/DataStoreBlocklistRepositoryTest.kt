@@ -9,7 +9,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -27,9 +30,16 @@ class DataStoreBlocklistRepositoryTest {
     // DataStoreAppRepositoryTest's identical field for the Windows file-handle hang this prevents.
     private val dataStoreScope = CoroutineScope(SupervisorJob())
 
+    // Separate from dataStoreScope (which only backs the DataStore's own internal actor) --
+    // this one backs DataStoreBlocklistRepository's own reactive-cache collector. Routed through
+    // createRepository() so every existing test in this file gets a cancellable scope with no
+    // per-test-body changes, rather than silently leaking one on the class's own default.
+    private val repositoryScope = CoroutineScope(SupervisorJob())
+
     @After
     fun tearDown() {
         dataStoreScope.cancel()
+        repositoryScope.cancel()
     }
 
     private class FakeBlocklistFetcher(private val response: String?) : BlocklistFetcher {
@@ -49,7 +59,7 @@ class DataStoreBlocklistRepositoryTest {
     private fun createRepository(
         dataStore: DataStore<Preferences> = createDataStore(),
         fetcher: BlocklistFetcher = FakeBlocklistFetcher(response = null),
-    ): DataStoreBlocklistRepository = DataStoreBlocklistRepository(dataStore, fetcher)
+    ): DataStoreBlocklistRepository = DataStoreBlocklistRepository(dataStore, fetcher, repositoryScope)
 
     private suspend fun seedRemoteCache(dataStore: DataStore<Preferences>, hostsFileBody: String) {
         val remoteCacheKey = stringPreferencesKey("blocklist_remote_cache")
@@ -195,5 +205,51 @@ class DataStoreBlocklistRepositoryTest {
 
         assertEquals(1, garbledFetcher.callCount)
         assertTrue(repository.isBlocked("already-cached.example"))
+    }
+
+    // Final review (Important #3): the original version of this test passed trivially, since
+    // nothing was ever seeded into the DataStore -- it would have passed even if the reactive
+    // collector ran synchronously. Seeding first and holding the repository's own collector
+    // coroutine paused on a StandardTestDispatcher (which runs nothing until explicitly advanced)
+    // proves the real cold-start window: data already exists in the DataStore, but isBlockedNow
+    // still returns false until the collector actually gets to run.
+    @Test
+    fun `isBlockedNow returns false before the reactive collector has run, even with data already seeded`() =
+        runBlocking {
+            val dataStore = createDataStore()
+            seedRemoteCache(dataStore, "0.0.0.0 ads.example.com")
+            val dispatcher = StandardTestDispatcher()
+            val pausedScope = CoroutineScope(dispatcher)
+            val repository = DataStoreBlocklistRepository(dataStore, FakeBlocklistFetcher(null), pausedScope)
+
+            assertEquals(false, repository.isBlockedNow("ads.example.com"))
+
+            dispatcher.scheduler.advanceUntilIdle()
+            assertTrue(awaitUntil { repository.isBlockedNow("ads.example.com") })
+            pausedScope.cancel()
+        }
+
+    @Test
+    fun `isBlockedNow tracks a changing remote cache reactively`() = runBlocking {
+        // Not runTest: repositoryScope's collector runs on a real dispatcher (Dispatchers.Default,
+        // same as production), independent of any virtual-time test scheduler, so there is no
+        // single suspension point a test coroutine could yield at to deterministically guarantee
+        // it has already run. A bounded real-time poll is the honest tool for an in-memory cache
+        // whose update is driven by a genuinely concurrent background collector.
+        val dataStore = createDataStore()
+        val repository = createRepository(dataStore)
+        seedRemoteCache(dataStore, "0.0.0.0 ads.example.com")
+
+        assertTrue(awaitUntil { repository.isBlockedNow("ads.example.com") })
+        assertEquals(false, repository.isBlockedNow("other.example.com"))
+    }
+
+    private suspend fun awaitUntil(timeoutMillis: Long = 2_000, condition: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        while (System.currentTimeMillis() < deadline) {
+            if (condition()) return true
+            delay(10)
+        }
+        return condition()
     }
 }
