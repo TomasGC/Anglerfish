@@ -1,7 +1,9 @@
 package app.anglerfish.nat
 
+import java.io.ByteArrayOutputStream
 import javax.crypto.Cipher
 import javax.crypto.Mac
+import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 internal data class InitialSecrets(val key: ByteArray, val iv: ByteArray, val hp: ByteArray)
@@ -152,3 +154,133 @@ private val INITIAL_SALT = hexToBytes("38762cf7f55934b34d179ae6a4c80cadccbb7f0a"
 
 private fun hexToBytes(hex: String): ByteArray =
     ByteArray(hex.length / 2) { i -> hex.substring(i * 2, i * 2 + 2).toInt(HEX_RADIX).toByte() }
+
+object QuicInitialPacket {
+    // RFC 9001 end to end for one UDP datagram: derive secrets from the packet's own DCID,
+    // remove header protection, AEAD-decrypt, then pull the first CRYPTO frame's bytes out of
+    // the decrypted frame stream and wrap them as a synthetic TLS record -- QUIC carries TLS
+    // handshake messages directly via CRYPTO frames with no record-layer framing of its own, so
+    // this wrapper is what lets TlsClientHelloBuffer's one parser serve both the TCP and QUIC
+    // paths instead of needing two. A ClientHello spanning more than this one Initial packet's
+    // CRYPTO frame fails open here (Pending from TlsClientHelloBuffer), out of scope for v1.
+    @Suppress("ReturnCount")
+    fun extractClientHello(datagram: ByteArray): ByteArray? {
+        val parsed = parseLongHeaderPrefix(datagram) ?: return null
+        val secrets = deriveInitialSecrets(parsed.dcid)
+        val unprotected = removeHeaderProtection(datagram, parsed, secrets.hp) ?: return null
+        val plaintext = decrypt(unprotected, secrets) ?: return null
+        val cryptoData = findCryptoFrame(plaintext) ?: return null
+        return wrapAsTlsRecord(cryptoData)
+    }
+
+    private fun decrypt(unprotected: UnprotectedInitial, secrets: InitialSecrets): ByteArray? =
+        try {
+            val nonce = buildNonce(secrets.iv, unprotected.packetNumber)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                init(Cipher.DECRYPT_MODE, SecretKeySpec(secrets.key, "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
+                updateAAD(unprotected.header)
+            }
+            cipher.doFinal(unprotected.protectedPayload)
+        } catch (@Suppress("TooGenericExceptionCaught", "SwallowedException") e: Exception) {
+            null
+        }
+
+    // RFC 9001 Section 5.3: nonce = iv XOR (packet number, left-padded with zeros to iv's length,
+    // big-endian). The packet number itself is at most 4 bytes (ASSUMED_MAX_PACKET_NUMBER_LENGTH),
+    // always smaller than iv's 12 bytes, so padding is naturally everything buildNonce doesn't touch.
+    private fun buildNonce(iv: ByteArray, packetNumber: Long): ByteArray {
+        val packetNumberBytes = ByteArray(iv.size)
+        for (k in 0 until LONG_SIZE_BYTES) {
+            val index = iv.size - 1 - k
+            if (index < 0) break
+            packetNumberBytes[index] = ((packetNumber shr (BITS_PER_BYTE * k)) and BYTE_MASK.toLong()).toByte()
+        }
+        return ByteArray(iv.size) { i -> (iv[i].toInt() xor packetNumberBytes[i].toInt()).toByte() }
+    }
+
+    // RFC 9000 Section 19.6 (CRYPTO frame) + Section 19.1 (PADDING, 0x00) + Section 19.2 (PING,
+    // 0x01, no body). Chrome/Cronet's "chaos protection" -- used by exactly the Google/Firebase/
+    // AppsFlyer-style ad SDK traffic this feature targets -- splits the ClientHello across
+    // several out-of-order CRYPTO frames interleaved with PING/PADDING in the same Initial
+    // packet. Final review (Important #1): the original version returned only the first CRYPTO
+    // frame found and aborted entirely on anything else, so it would have recovered a fragment
+    // or nothing from exactly that traffic. This collects every CRYPTO frame in the datagram,
+    // then reassembles the contiguous run starting at stream offset 0 -- a gap, or a frame type
+    // this function doesn't understand (e.g. ACK), stops the scan there rather than discarding
+    // what was already found, since a partial-but-valid prefix is still useful to
+    // TlsClientHelloBuffer (it already treats an incomplete ClientHello as Pending, not a crash).
+    internal fun findCryptoFrame(plaintext: ByteArray): ByteArray? {
+        val chunks = mutableListOf<Pair<Long, ByteArray>>()
+        var i = 0
+        while (i < plaintext.size) {
+            i = scanOneFrame(plaintext, i, chunks) ?: break
+        }
+        return reassembleFromOffsetZero(chunks)
+    }
+
+    // One step of the frame scan: PADDING/PING advance past themselves, a CRYPTO frame is
+    // recorded into `chunks` and advances past its data, anything else (a parse failure, a gap
+    // at the end of the datagram, or a frame type this function doesn't understand, e.g. ACK)
+    // returns null to stop the scan -- findCryptoFrame still reassembles whatever chunks were
+    // already collected rather than discarding them.
+    @Suppress("ReturnCount")
+    private fun scanOneFrame(plaintext: ByteArray, start: Int, chunks: MutableList<Pair<Long, ByteArray>>): Int? {
+        val frameType = readVarInt(plaintext, start) ?: return null
+        if (frameType.first == PADDING_FRAME_TYPE || frameType.first == PING_FRAME_TYPE) {
+            return start + frameType.second
+        }
+        if (frameType.first != CRYPTO_FRAME_TYPE) return null
+
+        var i = start + frameType.second
+        val offset = readVarInt(plaintext, i) ?: return null
+        i += offset.second
+        val length = readVarInt(plaintext, i) ?: return null
+        i += length.second
+        val dataLength = length.first.toInt()
+        if (dataLength < 0 || plaintext.size < i + dataLength) return null
+        chunks += offset.first to plaintext.copyOfRange(i, i + dataLength)
+        return i + dataLength
+    }
+
+    // Sorts the collected CRYPTO chunks by stream offset and concatenates the contiguous run
+    // starting at 0, trimming any byte range a later chunk re-covers and stopping at the first
+    // gap. Null if nothing starts at offset 0 at all.
+    private fun reassembleFromOffsetZero(chunks: List<Pair<Long, ByteArray>>): ByteArray? {
+        val sorted = chunks.sortedBy { it.first }
+        val out = ByteArrayOutputStream()
+        var expectedOffset = 0L
+        var index = 0
+        while (index < sorted.size && sorted[index].first <= expectedOffset) {
+            val (offset, data) = sorted[index]
+            val alreadyCovered = (expectedOffset - offset).toInt()
+            if (alreadyCovered < data.size) {
+                out.write(data, alreadyCovered, data.size - alreadyCovered)
+                expectedOffset += (data.size - alreadyCovered)
+            }
+            index++
+        }
+        val result = out.toByteArray()
+        return if (result.isEmpty()) null else result
+    }
+
+    private fun wrapAsTlsRecord(handshakeMessage: ByteArray): ByteArray {
+        val length = handshakeMessage.size
+        val recordHeader = byteArrayOf(
+            TLS_HANDSHAKE_CONTENT_TYPE,
+            TLS_RECORD_LEGACY_VERSION_MAJOR,
+            TLS_RECORD_LEGACY_VERSION_MINOR,
+            (length shr BITS_PER_BYTE).toByte(),
+            length.toByte(),
+        )
+        return recordHeader + handshakeMessage
+    }
+
+    private const val CRYPTO_FRAME_TYPE = 0x06L
+    private const val PADDING_FRAME_TYPE = 0x00L
+    private const val PING_FRAME_TYPE = 0x01L
+    private const val GCM_TAG_BITS = 128
+    private const val LONG_SIZE_BYTES = 8
+    private const val TLS_HANDSHAKE_CONTENT_TYPE: Byte = 0x16
+    private const val TLS_RECORD_LEGACY_VERSION_MAJOR: Byte = 0x03
+    private const val TLS_RECORD_LEGACY_VERSION_MINOR: Byte = 0x01
+}

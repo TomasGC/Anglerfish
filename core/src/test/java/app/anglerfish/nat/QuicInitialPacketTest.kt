@@ -68,6 +68,113 @@ class QuicInitialPacketTest {
         assertEquals(1178, result.protectedPayload.size) // 1182 - 4-byte packet number
     }
 
+    @Test
+    fun `extractClientHello recovers the real ClientHello from the RFC example packet`() {
+        val clientHello = QuicInitialPacket.extractClientHello(clientInitialPacket)
+
+        assertNotNull(clientHello)
+        val sniResult = TlsClientHelloBuffer().feed(clientHello!!)
+        assertEquals(SniResult.Resolved("example.com"), sniResult)
+    }
+
+    @Test
+    fun `extractClientHello fails open on an unsupported QUIC version`() {
+        val mutated = clientInitialPacket.copyOf()
+        mutated[1] = 0x00; mutated[2] = 0x00; mutated[3] = 0x00; mutated[4] = 0x02 // version 2, unsupported
+
+        assertEquals(null, QuicInitialPacket.extractClientHello(mutated))
+    }
+
+    @Test
+    fun `extractClientHello fails open on a truncated datagram`() {
+        val truncated = clientInitialPacket.copyOfRange(0, 30)
+
+        assertEquals(null, QuicInitialPacket.extractClientHello(truncated))
+    }
+
+    @Test
+    fun `extractClientHello fails open when AEAD authentication fails`() {
+        // Corrupts the ciphertext so AEAD authentication fails -- the same fail-open path a
+        // genuinely non-CRYPTO-bearing (e.g. ACK-only) Initial packet would also take.
+        val corrupted = clientInitialPacket.copyOf()
+        corrupted[corrupted.size - 1] = (corrupted[corrupted.size - 1].toInt() xor 0xFF).toByte()
+
+        assertEquals(null, QuicInitialPacket.extractClientHello(corrupted))
+    }
+
+    // Final review (Important #1 + #3): the original findCryptoFrame returned only the first
+    // CRYPTO frame found and aborted entirely on anything else, so Chrome/Cronet's "chaos
+    // protection" -- which splits a ClientHello across several out-of-order CRYPTO frames
+    // interleaved with PING/PADDING in the same Initial packet, used by exactly the Google/
+    // Firebase/AppsFlyer-style ad SDK traffic this feature targets -- would have recovered only
+    // a fragment or nothing at all. These test the reassembly directly against hand-built
+    // plaintext frame streams, the same way parseLongHeaderPrefix/removeHeaderProtection are
+    // tested directly rather than only through the full encrypt/decrypt round trip.
+    //
+    // Frame bytes below use single-byte QUIC varints throughout (RFC 9000 Section 16): any value
+    // under 64 encodes as that literal byte, which covers every type/offset/length used here.
+    private fun cryptoFrame(offset: Int, data: ByteArray): ByteArray =
+        byteArrayOf(0x06, offset.toByte(), data.size.toByte()) + data
+
+    private fun paddingByte(): ByteArray = byteArrayOf(0x00)
+    private fun pingFrame(): ByteArray = byteArrayOf(0x01)
+
+    @Test
+    fun `reassembles two out-of-order CRYPTO frames into their contiguous stream`() {
+        val second = cryptoFrame(offset = 5, data = "world".toByteArray(Charsets.US_ASCII))
+        val first = cryptoFrame(offset = 0, data = "hello".toByteArray(Charsets.US_ASCII))
+        val plaintext = second + first // out of order on purpose
+
+        val result = QuicInitialPacket.findCryptoFrame(plaintext)
+
+        assertArrayEquals("helloworld".toByteArray(Charsets.US_ASCII), result)
+    }
+
+    @Test
+    fun `skips interleaved PADDING and PING between CRYPTO frames`() {
+        val plaintext = cryptoFrame(offset = 0, data = "abc".toByteArray(Charsets.US_ASCII)) +
+            paddingByte() + pingFrame() +
+            cryptoFrame(offset = 3, data = "def".toByteArray(Charsets.US_ASCII))
+
+        val result = QuicInitialPacket.findCryptoFrame(plaintext)
+
+        assertArrayEquals("abcdef".toByteArray(Charsets.US_ASCII), result)
+    }
+
+    @Test
+    fun `returns the contiguous prefix instead of null when a later CRYPTO frame leaves a gap`() {
+        val plaintext = cryptoFrame(offset = 0, data = "abc".toByteArray(Charsets.US_ASCII)) +
+            cryptoFrame(offset = 10, data = "xyz".toByteArray(Charsets.US_ASCII)) // gap: nothing covers offset 3..9
+
+        val result = QuicInitialPacket.findCryptoFrame(plaintext)
+
+        assertArrayEquals("abc".toByteArray(Charsets.US_ASCII), result)
+    }
+
+    @Test
+    fun `fails open when no CRYPTO frame starts at offset 0`() {
+        val plaintext = cryptoFrame(offset = 5, data = "xyz".toByteArray(Charsets.US_ASCII))
+
+        assertEquals(null, QuicInitialPacket.findCryptoFrame(plaintext))
+    }
+
+    @Test
+    fun `fails open when the decrypted payload has no CRYPTO frame at all`() {
+        val plaintext = paddingByte() + paddingByte() + pingFrame()
+
+        assertEquals(null, QuicInitialPacket.findCryptoFrame(plaintext))
+    }
+
+    @Test
+    fun `keeps the contiguous prefix found before an unrecognized frame type stops the scan`() {
+        val plaintext = cryptoFrame(offset = 0, data = "abc".toByteArray(Charsets.US_ASCII)) +
+            byteArrayOf(0x02) // ACK (0x02) is a real QUIC frame type this parser doesn't handle
+
+        val result = QuicInitialPacket.findCryptoFrame(plaintext)
+
+        assertArrayEquals("abc".toByteArray(Charsets.US_ASCII), result)
+    }
+
     private companion object {
         // RFC 9001 Appendix A.2's protected client Initial packet, verbatim (1200 bytes).
         // Extracted programmatically from the RFC's own published text (every hex digit
