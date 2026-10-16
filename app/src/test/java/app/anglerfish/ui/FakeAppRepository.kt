@@ -18,6 +18,10 @@ class FakeAppRepository : AppRepository {
     // setActive(false) while this toggleHidden call is still in flight, to reproduce the
     // race between reading state before and after the repository call.
     var deactivateDuringToggleHidden = false
+    // #62: counts real setActive(...) calls, separate from markInactiveFromGatewayStop()'s
+    // simulated out-of-band write -- lets a test prove the ViewModel itself never calls
+    // setActive(false) directly any more (see onDeactivateClicked's regression test).
+    var setActiveCallCount = 0
     override val state: Flow<BlockingState> = flow
     override val layout: Flow<AppListLayout> = layoutFlow
     override suspend fun toggleSelection(packageName: String) {
@@ -46,7 +50,16 @@ class FakeAppRepository : AppRepository {
         )
     }
     override suspend fun setActive(active: Boolean) {
+        setActiveCallCount++
         flow.value = flow.value.copy(isActive = active)
+    }
+
+    // #62: production's single writer of isActive=false on deactivate is now
+    // AnglerfishVpnService's ACTION_DEACTIVATE handler, not the ViewModel -- FakeVpnGateway.stop()
+    // calls this to simulate that write landing, without needing a suspend fun (VpnGateway.stop()
+    // is fire-and-forget, same as the real Intent-based call).
+    fun markInactiveFromGatewayStop() {
+        flow.value = flow.value.copy(isActive = false)
     }
     override suspend fun setLayout(layout: AppListLayout) {
         layoutFlow.value = layout

@@ -86,8 +86,12 @@ class AppListViewModel(
             val after = repository.state.first()
             if (after.isActive && before.selectedPackages != after.selectedPackages) {
                 if (after.selectedPackages.isEmpty()) {
+                    // #62: no repository.setActive(false) here -- AnglerfishVpnService's own
+                    // ACTION_DEACTIVATE handler (which vpnGateway.stop() triggers) is the single
+                    // writer of isActive=false. A second writer racing it for DataStore's internal
+                    // lock from the Main dispatcher deadlocked the main thread (confirmed via an
+                    // on-device ANR trace parked in runBlocking at AnglerfishVpnService.kt:84).
                     vpnGateway.stop()
-                    repository.setActive(false)
                 } else {
                     vpnGateway.restart(after.selectedPackages.keys)
                 }
@@ -101,8 +105,8 @@ class AppListViewModel(
             val state = repository.state.first()
             if (state.isActive) {
                 if (state.selectedPackages.isEmpty()) {
+                    // #62: see toggleHidden's comment above -- same single-writer fix.
                     vpnGateway.stop()
-                    repository.setActive(false)
                 } else {
                     vpnGateway.restart(state.selectedPackages.keys)
                 }
@@ -132,10 +136,13 @@ class AppListViewModel(
         }
     }
 
+    // #62: no repository.setActive(false) here -- see toggleHidden's comment above. The service's
+    // ACTION_DEACTIVATE handler is the only path that must persist isActive=false, since it is
+    // also the sole writer for the notification's Stop button and onRevoke(), where no ViewModel
+    // is running to write it at all.
     fun onDeactivateClicked() {
         viewModelScope.launch {
             vpnGateway.stop()
-            repository.setActive(false)
         }
     }
 
