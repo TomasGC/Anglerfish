@@ -300,3 +300,32 @@ relays need. Tests pass a fake factory whose sessions only record `close()` and 
 seam goes at the session interface rather than at the timeouts: a test that only asserts the
 timeout constants passes even when the two `evictIdle` calls are swapped. Keeping `VpnService` out
 of `NatRelay`'s constructor also means the test needs no Android types.
+
+## Patterns In Use (added in issue #42)
+
+### Per-Flow Cache Reuses the Existing Session Container
+
+`FlowBlockModeResolver` caches each flow's resolved `BlockMode` in a `SessionTable<BlockMode>` —
+the same generic container `NatRelay` already uses for `UdpSession`/`TcpSession` (#41), not a new
+`Map<FlowKey, BlockMode>` with its own hand-rolled eviction. `BlockMode` is fixed for the lifetime
+of one tunnel run (switching a selected app's mode is only possible while the tunnel is stopped),
+so there is no "mode changed under me" invalidation case to design around — a resolved entry is
+correct until the flow itself goes idle. Its idle timeout (10 minutes) is deliberately longer than
+`NatRelay`'s own (60s UDP / 5min TCP): re-resolving a mode costs a real uid lookup, re-creating a
+NAT session does not, so outliving the NAT session it was first resolved for is the cheap direction
+to err in.
+
+### API-29 Cutoff for UID Attribution, One Gate Function
+
+`ConnectivityManager.getConnectionOwnerUid()` is the only officially supported way to map a
+TCP/UDP flow back to the app that owns it, and it requires API 29 (Android Q). Below that, no
+official API exists at all — `ProcNetUidResolver` parses `/proc/net/{tcp,udp}` directly instead,
+the same mechanism the maintained open-source NetGuard project uses for this exact SDK range (raw
+NETLINK sockets are SELinux-blocked on stock Android, which is why NetGuard itself reads the file
+as plain text too). `SdkGatedUidResolver` is the one place that knows both implementations exist;
+every caller depends on the `UidResolver` interface and never branches on `Build.VERSION.SDK_INT`
+itself — same shape as `DnsForwarder`/`DnsResolverProvider`'s real-vs-fake seam, applied to a
+real-vs-real split instead. `/proc/net`'s address fields are 8 hex chars in host (little-endian)
+byte order, so the decoded bytes are reversed relative to normal dotted-decimal reading; the port
+field is plain big-endian hex and needs no reversal — confirmed against NetGuard's own `ip.c`
+(`get_uid_sub`), not guessed from the `proc(5)` man page alone.

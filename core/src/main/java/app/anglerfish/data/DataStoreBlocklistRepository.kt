@@ -45,10 +45,28 @@ class DataStoreBlocklistRepository(
 
     override suspend fun isBlocked(domain: String): Boolean {
         val preferences = dataStore.data.first()
-        val remote = parseHostsFile(preferences[REMOTE_CACHE_KEY].orEmpty())
+        val remote = parsedRemoteCache(preferences[REMOTE_CACHE_KEY].orEmpty())
         val additions = preferences[USER_ADDITIONS_KEY].orEmpty()
         return isDomainBlocked(domain, remote + additions)
     }
+
+    // Re-parsing the full remote hosts text (StevenBlack's list is multi-hundred-thousand lines)
+    // on every single DNS query was the #39 deferral -- #42 made it a live per-query cost on the
+    // one tun-drain thread. Keyed on the raw text itself rather than a separate change flag: a
+    // changed remote cache is naturally a different string, so the comparison alone is correct
+    // invalidation, and @Synchronized matches FileDescriptorTunWriter's shared-mutable-state
+    // precedent (isBlocked can be called concurrently once DNS handling moves off the drain thread).
+    @Synchronized
+    private fun parsedRemoteCache(raw: String): Set<String> {
+        if (raw != lastParsedRaw) {
+            lastParsedRaw = raw
+            lastParsedResult = parseHostsFile(raw)
+        }
+        return lastParsedResult
+    }
+
+    private var lastParsedRaw: String? = null
+    private var lastParsedResult: Set<String> = emptySet()
 
     // Only updates the cache and timestamp on a fetch that both succeeds AND parses to something
     // non-empty -- a 200 response from a captive portal or an error page is otherwise

@@ -12,6 +12,9 @@ class SessionTable<T> {
     fun get(key: FlowKey): T? = entries[key]?.value
 
     @Synchronized
+    fun values(): List<T> = entries.values.map { it.value }
+
+    @Synchronized
     fun put(key: FlowKey, value: T, now: Long) {
         entries[key] = Entry(value, now)
     }

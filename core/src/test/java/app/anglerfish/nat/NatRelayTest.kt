@@ -36,6 +36,20 @@ class NatRelayTest {
         assertTrue(factory.tcp.single().closed)
     }
 
+    // Final review (I3): teardownTunnel() restarts/stops the whole tunnel, which must not leak
+    // every still-open relay socket and blocked IO thread -- closeAll() is what it calls to close
+    // every live session, not just ones that have gone idle.
+    @Test
+    fun `closeAll closes every live UDP and TCP session, not just idle ones`() {
+        relay.handleOutgoingPacket(udpPacket(), now = 0L)
+        relay.handleOutgoingPacket(tcpSyn(), now = 0L)
+
+        relay.closeAll()
+
+        assertTrue(factory.udp.single().closed)
+        assertTrue(factory.tcp.single().closed)
+    }
+
     private fun udpPacket(): ByteArray = Ipv4UdpPacket.build(
         sourceAddress = InetAddress.getByName("10.0.0.2"),
         sourcePort = 5353,
