@@ -11,7 +11,7 @@ class RelaySessionFactory(
     private val blocklistRepository: BlocklistRepository,
 ) : SessionFactory {
     override fun createUdp(endpoints: FlowEndpoints, onClosed: () -> Unit): UdpSession =
-        UdpRelay(vpnService, endpoints, tunWriter, scope, onClosed)
+        UdpRelay(vpnService, endpoints, tunWriter, scope, blocklistRepository, onClosed)
 
     override fun createTcp(endpoints: FlowEndpoints, onClosed: () -> Unit): TcpSession =
         TcpRelay(vpnService, endpoints, tunWriter, scope, blocklistRepository, onClosed)

@@ -1,6 +1,7 @@
 package app.anglerfish.nat
 
 import android.net.VpnService
+import app.anglerfish.data.BlocklistRepository
 import app.anglerfish.dns.Ipv4UdpPacket
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -21,9 +22,12 @@ class UdpRelay(
     private val endpoints: FlowEndpoints,
     private val tunWriter: TunWriter,
     scope: CoroutineScope,
+    private val blocklistRepository: BlocklistRepository,
     private val onClosed: () -> Unit,
 ) : UdpSession {
     private val closed = AtomicBoolean(false)
+    private var firstDatagramSeen = false
+    private var blocked = false
 
     private val socket = DatagramSocket().apply {
         vpnService.protect(this)
@@ -32,7 +36,27 @@ class UdpRelay(
 
     private val relayJob: Job = scope.launch(Dispatchers.IO) { relayLoop() }
 
+    // #63: only the flow's first datagram is inspected -- a QUIC Initial packet, if this is one
+    // at all. Non-QUIC UDP/443 traffic (QuicInitialPacket.extractClientHello returns null) and
+    // every later datagram on an already-decided flow pass straight through, same as before.
+    // SniGate is constructed fresh and used once here rather than held as a field, since a QUIC
+    // Initial packet's ClientHello realistically always arrives whole in one UDP datagram --
+    // unlike TCP, there's no multi-call buffering need on this path; a Pending result from a
+    // single offer() call is simply treated the same as "not blocked", consistent with the
+    // spec's documented QUIC fragmentation fail-open limit.
     override fun sendToDestination(payload: ByteArray) {
+        if (blocked) return
+        if (!firstDatagramSeen) {
+            firstDatagramSeen = true
+            val clientHello = QuicInitialPacket.extractClientHello(payload)
+            if (clientHello != null) {
+                val gate = SniGate(blocklistRepository::isBlockedNow)
+                if (gate.offer(clientHello) == SniGateResult.Blocked) {
+                    blocked = true
+                    return
+                }
+            }
+        }
         try {
             socket.send(DatagramPacket(payload, payload.size))
         } catch (_: IOException) {
