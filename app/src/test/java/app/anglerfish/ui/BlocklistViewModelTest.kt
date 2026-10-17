@@ -41,6 +41,7 @@ class BlocklistViewModelTest {
         }
         override suspend fun isBlocked(domain: String): Boolean = domain in additions.value
         override suspend fun refreshIfStale() {}
+        override fun isBlockedNow(domain: String): Boolean = domain in additions.value
     }
 
     @Test

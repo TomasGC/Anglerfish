@@ -6,10 +6,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val USER_ADDITIONS_KEY = stringSetPreferencesKey("blocklist_user_additions")
@@ -26,7 +29,27 @@ private const val REFRESH_INTERVAL_MS = 24L * 60 * 60 * 1000
 class DataStoreBlocklistRepository(
     private val dataStore: DataStore<Preferences>,
     private val fetcher: BlocklistFetcher = HttpBlocklistFetcher(),
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : BlocklistRepository {
+
+    // Reactively kept current from dataStore.data, independent of parsedRemoteCache's own
+    // memoization (which only avoids re-parsing identical raw text, not the suspend Flow read
+    // itself). isBlockedNow needs a synchronous read with no suspend point at all -- calling the
+    // existing suspend isBlocked from TcpRelay/UdpRelay's non-suspend call sites would mean
+    // runBlocking, the exact anti-pattern that deadlocked issue #62.
+    @Volatile
+    private var cachedBlockedDomains: Set<String> = emptySet()
+
+    init {
+        scope.launch {
+            dataStore.data.collect { preferences ->
+                val remote = parsedRemoteCache(preferences[REMOTE_CACHE_KEY].orEmpty())
+                cachedBlockedDomains = remote + preferences[USER_ADDITIONS_KEY].orEmpty()
+            }
+        }
+    }
+
+    override fun isBlockedNow(domain: String): Boolean = isDomainBlocked(domain, cachedBlockedDomains)
 
     override val userAdditions: Flow<Set<String>> =
         dataStore.data.map { preferences -> preferences[USER_ADDITIONS_KEY].orEmpty() }

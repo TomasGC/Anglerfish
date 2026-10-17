@@ -1,6 +1,7 @@
 package app.anglerfish.nat
 
 import android.net.VpnService
+import app.anglerfish.data.BlocklistRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,10 +27,12 @@ class TcpRelay(
     private val endpoints: FlowEndpoints,
     private val tunWriter: TunWriter,
     private val scope: CoroutineScope,
+    private val blocklistRepository: BlocklistRepository,
     private val onClosed: () -> Unit,
 ) : TcpSession {
     private val stateLock = Any()
     private val closed = AtomicBoolean(false)
+    private val sniGate = SniGate(blocklistRepository::isBlockedNow)
 
     @Volatile
     private var connection = TcpConnection(TcpConnectionState.SYN_RECEIVED, sequenceNumber = 0L, ackNumber = 0L)
@@ -76,19 +79,29 @@ class TcpRelay(
     private fun performAction(action: TcpAction) {
         when (action) {
             is TcpAction.SendSegment -> tunWriter.write(buildOutgoingSegment(action.segment))
-            is TcpAction.DeliverToDestination -> {
-                try {
-                    socket?.getOutputStream()?.write(action.payload)
-                } catch (_: IOException) {
-                    transition { TcpStateMachine.onDestinationUnreachable(it) }
-                    close()
-                }
-            }
+            is TcpAction.DeliverToDestination -> deliverToDestination(action.payload)
             TcpAction.CloseDestinationSocket -> close()
             TcpAction.ShutdownDestinationOutput -> {
                 // the socket may already be on its way down; nothing left to shut down cleanly
                 try { socket?.shutdownOutput() } catch (_: IOException) { }
             }
+        }
+    }
+
+    // #63: every flow's first bytes (the app's TLS ClientHello) pass through SniGate before
+    // reaching the real socket. A blocked flow is never written to again -- the app's own TLS
+    // handshake was already ACKed normally by TcpStateMachine before this point, so it just
+    // waits for a ServerHello that will never arrive and times out on its own, the same
+    // "silently drop, no response" behavior AdFilterOnly already gives every other blocked
+    // packet, without needing to fake a connection that was never really established.
+    private fun deliverToDestination(payload: ByteArray) {
+        val result = sniGate.offer(payload)
+        if (result !is SniGateResult.Write) return
+        try {
+            result.chunks.forEach { socket?.getOutputStream()?.write(it) }
+        } catch (_: IOException) {
+            transition { TcpStateMachine.onDestinationUnreachable(it) }
+            close()
         }
     }
 
@@ -116,35 +129,33 @@ class TcpRelay(
     // reaching Ipv4TcpPacket.build, an unanticipated exception from the real socket) -- this runs on
     // its own coroutine, so an uncaught exception here would otherwise propagate to the scope's
     // handler and, depending on how #42 wires the scope, could take down every other flow's relay.
+    // Folded connectAndRelay() in here (#63): TooManyFunctions caps this class at 11, and the two
+    // were only ever called in sequence from this one place.
     private suspend fun runRelay() {
         try {
-            connectAndRelay()
+            val realSocket = try {
+                Socket().apply {
+                    vpnService.protect(this)
+                    connect(InetSocketAddress(endpoints.destAddress, endpoints.destPort), CONNECT_TIMEOUT_MS)
+                }
+            } catch (_: IOException) {
+                transition { TcpStateMachine.onConnectFailed(pendingAppSequenceNumber) }
+                close()
+                return
+            }
+            if (closed.get()) {
+                realSocket.close()
+                return
+            }
+            socket = realSocket
+            val initialSequenceNumber = Random.nextInt().toLong() and SEQUENCE_MASK
+            transition { TcpStateMachine.onSyn(initialSequenceNumber, pendingAppSequenceNumber, pendingAppWindow) }
+            relayFromDestination(realSocket)
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught", "SwallowedException") e: Exception) {
             close()
         }
-    }
-
-    private fun connectAndRelay() {
-        val realSocket = try {
-            Socket().apply {
-                vpnService.protect(this)
-                connect(InetSocketAddress(endpoints.destAddress, endpoints.destPort), CONNECT_TIMEOUT_MS)
-            }
-        } catch (_: IOException) {
-            transition { TcpStateMachine.onConnectFailed(pendingAppSequenceNumber) }
-            close()
-            return
-        }
-        if (closed.get()) {
-            realSocket.close()
-            return
-        }
-        socket = realSocket
-        val initialSequenceNumber = Random.nextInt().toLong() and SEQUENCE_MASK
-        transition { TcpStateMachine.onSyn(initialSequenceNumber, pendingAppSequenceNumber, pendingAppWindow) }
-        relayFromDestination(realSocket)
     }
 
     // Pacing how fast we pull from the real socket to what the app's own advertised window allows:

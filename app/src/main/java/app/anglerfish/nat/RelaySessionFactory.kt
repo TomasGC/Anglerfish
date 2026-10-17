@@ -1,16 +1,18 @@
 package app.anglerfish.nat
 
 import android.net.VpnService
+import app.anglerfish.data.BlocklistRepository
 import kotlinx.coroutines.CoroutineScope
 
 class RelaySessionFactory(
     private val vpnService: VpnService,
     private val tunWriter: TunWriter,
     private val scope: CoroutineScope,
+    private val blocklistRepository: BlocklistRepository,
 ) : SessionFactory {
     override fun createUdp(endpoints: FlowEndpoints, onClosed: () -> Unit): UdpSession =
-        UdpRelay(vpnService, endpoints, tunWriter, scope, onClosed)
+        UdpRelay(vpnService, endpoints, tunWriter, scope, blocklistRepository, onClosed)
 
     override fun createTcp(endpoints: FlowEndpoints, onClosed: () -> Unit): TcpSession =
-        TcpRelay(vpnService, endpoints, tunWriter, scope, onClosed)
+        TcpRelay(vpnService, endpoints, tunWriter, scope, blocklistRepository, onClosed)
 }

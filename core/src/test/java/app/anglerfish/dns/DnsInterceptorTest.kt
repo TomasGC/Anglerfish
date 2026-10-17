@@ -31,6 +31,10 @@ class DnsInterceptorTest {
             return domain in blockedDomains
         }
         override suspend fun refreshIfStale() = Unit
+        override fun isBlockedNow(domain: String): Boolean {
+            isBlockedThrows?.let { throw it }
+            return domain in blockedDomains
+        }
     }
 
     private class FakeDnsForwarder(private val response: ByteArray?) : DnsForwarder {

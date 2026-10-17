@@ -8,4 +8,5 @@ interface BlocklistRepository {
     suspend fun removeDomain(domain: String)
     suspend fun isBlocked(domain: String): Boolean
     suspend fun refreshIfStale()
+    fun isBlockedNow(domain: String): Boolean
 }

@@ -90,6 +90,7 @@ class DnsInterceptorPipelineTest {
         override suspend fun removeDomain(domain: String) = error("not used by the interceptor")
         override suspend fun isBlocked(domain: String): Boolean = isDomainBlocked(domain, entries)
         override suspend fun refreshIfStale() = error("not used by the interceptor")
+        override fun isBlockedNow(domain: String): Boolean = error("not used by the interceptor")
     }
 
     private class FixedResolverProvider(private val resolvers: List<InetAddress>) : DnsResolverProvider {

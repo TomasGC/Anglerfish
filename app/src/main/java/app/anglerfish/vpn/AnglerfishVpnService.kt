@@ -111,7 +111,7 @@ class AnglerfishVpnService : VpnService() {
         val writer = FileDescriptorTunWriter(FileOutputStream(newDescriptor.fileDescriptor))
         serviceScope = scope
         tunWriter = writer
-        natRelay = NatRelay(RelaySessionFactory(this, writer, scope))
+        natRelay = NatRelay(RelaySessionFactory(this, writer, scope, blocklistRepository))
         dnsInterceptor = DnsInterceptor(
             blocklistRepository,
             ConnectivityManagerDnsResolverProvider(
