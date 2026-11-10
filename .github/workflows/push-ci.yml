@@ -12,19 +12,19 @@ concurrency:
 
 jobs:
   kotlin-pipeline:
-    uses: TomasGC/condor/.github/workflows/kotlin-push-ci.yml@main
+    uses: TomasGC/Condor/.github/workflows/kotlin-push-ci.yml@v1
     secrets: inherit
     with:
       app-name: anglerfish
       unit-tasks: '[":core:test", ":app:testDebugUnitTest"]'
       integration-mock-tasks: '[":core:integrationMock"]'
       integration-real-tasks: '[":core:integrationReal"]'
-      instrumented-task: ":app-instrumented:connectedDebugAndroidTest"
+      app-environments: '["android"]'
       # #23: 90%, measured against testable code only -- see app/build.gradle.kts's koverReport
       # exclude list and contexts/design-patterns.md for what's deliberately left out and why.
       coverage-threshold: 90
 
   python-pipeline:
-    uses: TomasGC/condor/.github/workflows/python-push-ci.yml@main
+    uses: TomasGC/Condor/.github/workflows/python-push-ci.yml@v1
     with:
       skip-on-no-changes: true

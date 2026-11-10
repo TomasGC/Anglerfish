@@ -244,6 +244,24 @@ class DataStoreBlocklistRepositoryTest {
         assertEquals(false, repository.isBlockedNow("other.example.com"))
     }
 
+    @Test
+    fun `a repository never serves an empty blocklist right after its collector starts`() = runBlocking {
+        // The collector started by the constructor and the constructor's own property initialisers
+        // used to race (#69): a memo the collector had just filled was reset to an empty result.
+        // The race is about timing, so one construction proves little; many give a CPU-starved
+        // machine, like a 2-core CI runner, no way to miss it.
+        repeat(200) { index ->
+            val dataStore = PreferenceDataStoreFactory.create(
+                scope = dataStoreScope,
+                produceFile = { tempFolder.newFile("race-$index.preferences_pb") },
+            )
+            seedRemoteCache(dataStore, "0.0.0.0 race.example")
+            val repository = createRepository(dataStore)
+
+            assertTrue("iteration $index", repository.isBlocked("race.example"))
+        }
+    }
+
     private suspend fun awaitUntil(timeoutMillis: Long = 2_000, condition: () -> Boolean): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {

@@ -107,3 +107,10 @@ name = "org.jetbrains.kotlin:kotlin-gradle-plugin"
 ecosystem = "Maven"
 ignore = true
 reason = "Build-tool dependency, not shipped in APK. GHSA-r937-wjx7-w2jp (CVE-2026-53914, Medium, local-attack-vector-only build-cache deserialization) has no stable fix yet - fix version 2.4.20-Beta1 is a pre-release. Revisit once Kotlin ships a stable 2.4.20+ release."
+
+[[PackageOverrides]]
+name = "com.google.guava:guava"
+version = "32.0.1-jre"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP 8.6.0 build tool dependency (the build classpath and the Unified Test Platform host tools), not shipped in the APK or on the :core classpath; checked with ./gradlew buildEnvironment :app:dependencies :core:dependencies :app-instrumented:dependencies on 2026-11-10. GHSA-xxph-c9ww-hj94 (High) is a memory exhaustion when deserializing attacker-controlled streams, which neither the build nor the tests do. Fixed in 33.7.2: look again on 2026-12-05, or when the AGP is updated, and drop this entry."
