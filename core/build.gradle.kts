@@ -5,7 +5,7 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 dependencies {
@@ -50,4 +50,13 @@ detekt {
     allRules = false
     config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
     source.setFrom("$projectDir/src/main/java")
+}
+
+// Condor's coverage gate reads the `merged` report of :app, which holds :app's debug classes and this module's.
+kover {
+    currentProject {
+        createVariant("merged") {
+            add("jvm")
+        }
+    }
 }

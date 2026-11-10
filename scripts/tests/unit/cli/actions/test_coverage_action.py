@@ -31,7 +31,7 @@ def _write_kover_report(report_path: Path, covered: int, missed: int) -> None:
 
 
 def _report_path(project_root: Path) -> Path:
-    return project_root / "app" / "build" / "reports" / "kover" / "reportDebug.xml"
+    return project_root / "app" / "build" / "reports" / "kover" / "reportMerged.xml"
 
 
 def test_run_fails_when_gradle_task_fails(tmp_path: Path, capsys) -> None:
@@ -44,7 +44,7 @@ def test_run_fails_when_gradle_task_fails(tmp_path: Path, capsys) -> None:
 
     # Assert
     assert exit_code == 1
-    assert gradle.tasks_run == ["koverXmlReportDebug"]
+    assert gradle.tasks_run == ["koverXmlReportMerged"]
 
 
 def test_run_fails_when_report_missing(tmp_path: Path, capsys) -> None:

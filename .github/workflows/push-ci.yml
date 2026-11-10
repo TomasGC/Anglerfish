@@ -23,6 +23,8 @@ jobs:
       # #23: 90%, measured against testable code only -- see app/build.gradle.kts's koverReport
       # exclude list and contexts/design-patterns.md for what's deliberately left out and why.
       coverage-threshold: 90
+      coverage-report-tasks: '["koverXmlReportMerged", "koverHtmlReportMerged"]'
+      coverage-xml-path: app/build/reports/kover/reportMerged.xml
 
   python-pipeline:
     uses: TomasGC/Condor/.github/workflows/python-push-ci.yml@v1
