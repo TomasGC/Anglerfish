@@ -103,18 +103,18 @@ See `contexts/architecture.md` and `contexts/design-patterns.md` for full detail
 
 | Component | Technology | Version | Purpose |
 |-----------|-----------|---------|---------|
-| **Language** | Kotlin | 2.0.20 | Modern JVM language with null-safety |
-| **Platform** | Android SDK | 26-36 | Android 8.0 to Android 16 |
-| **UI** | Jetpack Compose | BOM 2024.09.02 | Declarative UI framework |
+| **Language** | Kotlin | 2.4.21 | Modern JVM language with null-safety |
+| **Platform** | Android SDK | 26-37 | Android 8.0 to Android 17 (`targetSdk` 36) |
+| **UI** | Jetpack Compose | BOM 2026.09.00 | Declarative UI framework |
 | **Design** | Material Design 3 | (via Compose BOM) | Modern Material Design |
 | **DI** | None (manual `AppContainer`) | — | App is too small to justify Hilt's codegen |
-| **Persistence** | Jetpack DataStore (Preferences) | 1.1.1 | Selected-app set + active flag |
-| **Async** | Coroutines | 1.9.0 | Structured concurrency |
-| **Build** | Gradle KTS | AGP 8.6.0 | Kotlin DSL build scripts, version catalog |
-| **Testing** | JUnit4 + kotlinx-coroutines-test | 4.13.2 / 1.9.0 | Unit testing |
+| **Persistence** | Jetpack DataStore (Preferences) | 1.3.0 | Selected-app set + active flag |
+| **Async** | Coroutines | 1.11.0 | Structured concurrency |
+| **Build** | Gradle KTS | Gradle 9.9.1, AGP 9.5.1, JDK 21 | Kotlin DSL build scripts, version catalog |
+| **Testing** | JUnit4 + kotlinx-coroutines-test | 4.13.2 / 1.11.0 | Unit testing |
 | **Static analysis** | Detekt | 1.23.8 | `./gradlew detekt` — wired in issue #19, config in `config/detekt/detekt.yml` |
-| **Coverage** | Kover | 0.7.6 | `./gradlew koverXmlReportDebug` — report generated, no hard threshold gate (see below) |
-| **Dev tooling / CI** | Python `scripts/manage.py`, GitHub Actions via `TomasGC/condor` | — | Ported from Raven in issue #19 — see `contexts/commands.md` |
+| **Coverage** | Kover | 0.9.11 | `./gradlew koverXmlReportMerged` — `:app` plus `:core`; Condor gates it at 90% (see `contexts/design-patterns.md`) |
+| **Dev tooling / CI** | Python `scripts/manage.py`, GitHub Actions via `TomasGC/Condor` | — | Ported from Raven in issue #19 — see `contexts/commands.md` |
 
 These are floor versions — bump to newer stable patches at implementation time if available (see
 the implementation plan's Global Constraints).

@@ -4,6 +4,18 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-11-10 - [#71] Update the whole stack to the latest stable, JDK 21 included
+- Gradle 9.9.1 (pinned checksum, `retries`, 60 s `networkTimeout`), AGP 9.5.1 (Kotlin built in), Kotlin 2.4.21, Kover 0.9.11, JDK 21; Compose BOM 2026.09.00, core-ktx 1.19.1, lifecycle 2.11.0, activity-compose 1.13.0, Material 1.14.0, DataStore 1.3.0, coroutines 1.11.0, dnsjava 3.7.1, the androidx test set, the Python test packages; `compileSdk` 37, `targetSdk` stays 36
+- Kover 0.9 stopped merging `:core` into the debug report (71%, 107/149 lines, against 93%): a `merged` variant in both modules and the two Condor inputs fix it, 94% (871/923 lines) now, threshold 90
+- Material 3 no longer brings `material-icons-core` along: added explicitly (the nine icons the screens use)
+- Dependency scan: 17 entries down to 8, from the scanner's own output with no config; none of the eight is on a shipped classpath. Metadata rebuilt from scratch, Windows and Linux
+- Not checked: the VPN on a physical phone (CI emulator only); `E2E (android)` runs in CI
+tags: #ci-cd #upgrade #coverage
+Ref: https://github.com/TomasGC/Anglerfish/issues/71
+Commits: fb034b0, 624e924, 205846a, ab1f8f4, 63bb804
+
+---
+
 2026-11-10 - [#68] Call Condor v1 and declare the Android environment
 - `push-ci.yml` and `pr-ci.yml` call Condor at `v1`. Push-CI had failed at startup since Condor dropped `instrumented-task` (#15, #23): it now declares `app-environments: ["android"]`, and the default `android-e2e-task` is the existing `:app-instrumented` task
 - PR-CI runs on pull request events (#61) and passes `code-paths` and `test-paths` for `:app`, `:core` and `:app-instrumented`, so a change in `:core` reaches the context check

@@ -17,7 +17,7 @@ to the blocked apps.
 ## Requirements
 
 - Android 8.0 (API 26) or newer
-- Android Studio / JDK 17 to build from source
+- Android Studio / JDK 21 to build from source
 
 ## Building
 

@@ -80,7 +80,7 @@ sustained, unlike either busy-spinning on the syscall or giving up on the thread
 
 ### Coverage Threshold Measured Against Testable Code Only
 
-`app/build.gradle.kts`'s `koverReport` excludes classes that `contexts/architecture.md` and
+`app/build.gradle.kts`'s `kover { reports { filters } }` excludes classes that `contexts/architecture.md` and
 `contexts/tests.md` already document as deliberately untested — `VpnService.Builder`/real
 `Context` glue (`AnglerfishVpnService`, `VpnController`), real PackageManager/socket/HTTP glue
 (`InstalledAppsProvider`, `HttpBlocklistFetcher`, `UdpDnsForwarder`,
@@ -95,6 +95,10 @@ in `app/build.gradle.kts` as the Gradle-level enforcement, not just a CI-script 
 gaps (a handful of lines each in `NatRelay`, `TcpStateMachine`, `DnsInterceptor`,
 `TcpTransitions`, `Ipv4UdpPacket`, plus two untested small UI state types) are small enough to
 close incrementally without the threshold blocking unrelated work today.
+
+Kover 0.9 no longer merges `:core` into `:app`'s debug report (#71: 71%, 107 of 149 lines, instead of 93%). The `merged`
+variant in both modules, and `coverage-report-tasks` and `coverage-xml-path` in `push-ci.yml`, name the report Condor
+reads: `reportMerged.xml`.
 
 ---
 
@@ -114,6 +118,9 @@ artifact works when you don't have that OS locally — `workflow_dispatch` won't
 workflow that only exists on a feature branch, GitHub requires dispatchable workflows to already
 be on the default branch), download the result, and use it directly — don't hand-merge, the file
 already contains your platform's prior entries too.
+
+When versions change, regenerate from scratch (empty `<components>`) and not additively: the dependency scan reads this
+file, so entries for old versions would keep being flagged.
 
 ### Case-Sensitive Wrapper Checksum Comparison
 
