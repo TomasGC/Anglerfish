@@ -329,3 +329,17 @@ real-vs-real split instead. `/proc/net`'s address fields are 8 hex chars in host
 byte order, so the decoded bytes are reversed relative to normal dotted-decimal reading; the port
 field is plain big-endian hex and needs no reversal — confirmed against NetGuard's own `ip.c`
 (`get_uid_sub`), not guessed from the `proc(5)` man page alone.
+
+---
+
+## Patterns In Use (added in issue #69)
+
+### Declare State Before the `init` That Launches a Coroutine Reading It
+
+`DataStoreBlocklistRepository` starts a collector in `init { scope.launch { … } }` that calls
+`parsedRemoteCache`. Kotlin initialises properties in textual order, so the two memo fields declared after
+`init` were reset to `null` and `emptySet()` after the collector had already set them on another thread: a memo
+of the raw text with an empty result, and a blocklist that read as empty until the remote cache changed.
+`@Synchronized` does not help, it does not cover initialisers. Any field a launched coroutine touches is
+declared above the `init` that launches it. The failure shows only on a CPU-starved machine, so the class's
+integration-real test builds the repository 200 times (see `contexts/tests.md`).

@@ -10,11 +10,15 @@
 |------|-----------|-----------------|-------|
 | Unit (pure JVM) | `core/src/test` | AppListFilterTest 4, BlocklistParsingTest 15, DnsInterceptorTest 10, DnsMessagesTest 4, Ipv4UdpPacketTest 9, FlowKeyTest 3, Ipv4TcpPacketTest 20, NatRelayTest 3, SessionTableTest 8, TcpStateMachineTest 26, BlockModeResolutionTest 5, ProcNetLineTest 16, RetryingLookupTest 3 | 126 |
 | Integration-mock | `core/src/integrationMock` | DnsInterceptorPipelineTest 3 | 3 |
-| Integration-real | `core/src/integrationReal` | DataStoreAppRepositoryTest 16, DataStoreBlocklistRepositoryTest 12 | 28 |
+| Integration-real | `core/src/integrationReal` | DataStoreAppRepositoryTest 16, DataStoreBlocklistRepositoryTest 15 | 31 |
 | Android unit | `app/src/test` | AppListViewModelTest 23, BlocklistViewModelTest 5, Fake/DataStore contract tests 3 + 3, FlowBlockModeResolverTest 6 | 40 |
 | Instrumented | `app-instrumented/src/main` | ActivationFlowTest | 1 |
 | Manual | `docs/manual-testing.md` | 8 on-device scenarios (VpnService, notification, process death) | — |
-| **Total automated** | | | **198** |
+| **Total automated** | | | **201** |
+
+`DataStoreBlocklistRepositoryTest` builds the repository 200 times in one test (#69): the race it guards
+only shows on a CPU-starved machine, like a 2-core CI runner. To see it locally pin Gradle to one CPU
+(`taskset -c 0 ./gradlew :core:integrationReal` on Linux); without the fix it failed 4 of 4 runs.
 
 Per-test descriptions were in the old counts table; the test sources are the reference now.
 

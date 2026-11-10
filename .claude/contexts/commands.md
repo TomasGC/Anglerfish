@@ -57,16 +57,19 @@ same as Raven's own copy.
 
 ---
 
-## CI (GitHub Actions, via `TomasGC/condor`'s reusable workflows)
+## CI (GitHub Actions, via `TomasGC/Condor`'s reusable workflows, called at `@v1`)
 
 - `push-ci.yml` — runs on push to `feature/**`/`bugfix/**`. Kotlin: `validation` and `lint-checks` run in
   parallel with `unit` (matrix: `:core:test`, `:app:testDebugUnitTest`). Then `integration-mock`
   (`:core:integrationMock`), `integration-real` (`:core:integrationReal`), `build-apk` and `coverage`, and
-  `instrumented-tests` on a Gradle Managed Device. Each tier waits for the one before it. Python:
+  `e2e-android` (`app-environments: ["android"]`: the instrumented tests on an emulator, two shards, one
+  `E2E (android)` summary). Each tier waits for the one before it. Python:
   `python-pipeline` (skipped when nothing under `scripts/` changed).
-- `pr-ci.yml` — reports Push-CI's result back onto the PR once it completes.
+- `pr-ci.yml` — runs on the pull request itself (opened, reopened, synchronize, edited): title format, secret
+  scan and the context check. `code-paths` and `test-paths` cover `:app`, `:core` and `:app-instrumented`.
 - `.osv-scanner.toml` — overrides for AGP/Gradle-internal build-tool transitive dependencies
-  (netty, bouncycastle, commons-*, jose4j, freemarker, jdom2, the Kotlin Gradle plugin itself) —
+  (netty, bouncycastle, commons-*, jose4j, freemarker, jdom2, the Kotlin Gradle plugin itself, and Guava
+  32.0.1-jre scoped to that version, re-check 2026-12-05) —
   never shipped in the APK, so their CVEs don't apply to this app. Copied from Raven, which hits
   the identical set (same AGP/Gradle version family).
 - `gradle/verification-metadata.xml` — regenerate with

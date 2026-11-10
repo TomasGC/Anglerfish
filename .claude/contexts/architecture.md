@@ -115,7 +115,7 @@ copying the scale wholesale.
 
 Issue #19 ported Raven's `scripts/` Python dev-tooling (`manage.py build/test/validate/coverage`,
 see `contexts/commands.md`), Detekt, Kover, and both CI workflows (`push-ci.yml`/`pr-ci.yml`, via
-`TomasGC/condor`'s reusable workflows) wholesale rather than partially — unlike Hilt or a
+`TomasGC/Condor`'s reusable workflows, called at `@v1` since #68) wholesale rather than partially — unlike Hilt or a
 multi-module split, none of this tooling scales with app size, so there was no proportionality
-argument against adopting it now. `coverage-threshold: 0` in `push-ci.yml` and no `verify{}` gate
-in Gradle are deliberate interim choices, not oversights — see `contexts/design-patterns.md`.
+argument against adopting it now. `coverage-threshold` in `push-ci.yml` is 90 since #23: see
+`contexts/design-patterns.md`.
