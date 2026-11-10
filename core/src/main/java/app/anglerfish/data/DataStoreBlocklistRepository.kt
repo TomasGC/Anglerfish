@@ -32,6 +32,13 @@ class DataStoreBlocklistRepository(
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : BlocklistRepository {
 
+    // Declared before init on purpose (#69): Kotlin initialises properties in textual order, and init starts a
+    // collector on another thread that calls parsedRemoteCache. Fields declared after it were reset to their
+    // initial values after the collector had already set them, leaving a memo of the raw text with an empty
+    // result: the blocklist then read as empty until the remote cache changed.
+    private var lastParsedRaw: String? = null
+    private var lastParsedResult: Set<String> = emptySet()
+
     // Reactively kept current from dataStore.data, independent of parsedRemoteCache's own
     // memoization (which only avoids re-parsing identical raw text, not the suspend Flow read
     // itself). isBlockedNow needs a synchronous read with no suspend point at all -- calling the
@@ -87,9 +94,6 @@ class DataStoreBlocklistRepository(
         }
         return lastParsedResult
     }
-
-    private var lastParsedRaw: String? = null
-    private var lastParsedResult: Set<String> = emptySet()
 
     // Only updates the cache and timestamp on a fetch that both succeeds AND parses to something
     // non-empty -- a 200 response from a captive portal or an error page is otherwise
