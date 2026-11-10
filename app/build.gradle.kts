@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "app.anglerfish"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.anglerfish"
@@ -59,6 +59,8 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+    // The icons used by AppListScreen and BlocklistScreen: Material 3 stopped bringing them along.
+    implementation(libs.compose.material.icons.core)
     implementation(libs.material)
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
