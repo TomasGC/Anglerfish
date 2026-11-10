@@ -4,6 +4,18 @@ Track of work sessions and completed tasks linked to GitHub issues.
 
 ---
 
+2026-11-10 - [#68] Call Condor v1 and declare the Android environment
+- `push-ci.yml` and `pr-ci.yml` call Condor at `v1`. Push-CI had failed at startup since Condor dropped `instrumented-task` (#15, #23): it now declares `app-environments: ["android"]`, and the default `android-e2e-task` is the existing `:app-instrumented` task
+- PR-CI runs on pull request events (#61) and passes `code-paths` and `test-paths` for `:app`, `:core` and `:app-instrumented`, so a change in `:core` reaches the context check
+- Running the `:core` tiers in CI for the first time found a real race (#69): `DataStoreBlocklistRepository` declared its parse memo after the `init` block that starts the collector, so the constructor could reset it after the collector had filled it and the blocklist read as empty. Fixed by moving the fields up; a 200-construction stress test fails on 1 CPU without it (4 of 4) and the class passes 12 of 12 with it
+- Guava 32.0.1-jre (GHSA-xxph-c9ww-hj94) is build tooling only (AGP and its test-platform tools), so it is ignored in `.osv-scanner.toml` with a re-check date; updating AGP is the real fix
+- Not done: new tests for `PackageManager` and `VpnController` (#27); the on-device tests stay as they are
+tags: #ci-cd #condor #concurrency
+Ref: https://github.com/TomasGC/Anglerfish/issues/68
+Commits: a973730, f264f4f, 738f049, 6ce1f74
+
+---
+
 2026-10-05 - [#53] Split test tiers into Gradle source sets
 - `:core` JVM module holds the pure logic with `test`, `integrationMock` and `integrationReal` source sets; `:app` keeps the Android unit tests; `:app-instrumented` (`com.android.test`) runs the on-device `ActivationFlowTest`
 - Discovery-based Condor pipeline (Condor #2, #4, #5) failed at startup with zero jobs and no log: reverted in Condor #6; Anglerfish pins Condor `main` with `unit-job: true`
