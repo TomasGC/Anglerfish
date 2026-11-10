@@ -1,0 +1,5 @@
+# Git normalises text files to LF on every machine, whatever core.autocrlf says (a Windows commit with
+# autocrlf=false once stored CRLF for whole files). Windows batch files keep CRLF, as cmd needs them.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
