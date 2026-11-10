@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
@@ -8,7 +7,7 @@ plugins {
 
 android {
     namespace = "app.anglerfish"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.anglerfish"
@@ -25,12 +24,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     buildFeatures {
@@ -64,6 +59,8 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+    // The icons used by AppListScreen and BlocklistScreen: Material 3 stopped bringing them along.
+    implementation(libs.compose.material.icons.core)
     implementation(libs.material)
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
@@ -83,9 +80,9 @@ detekt {
     source.setFrom("$projectDir/src/main/java")
 }
 
-// Generates the XML report scripts/manage.py's coverage command reads (app/build/reports/kover/
-// reportDebug.xml). The threshold (issue #23) is measured against testable code only: the
-// excluded classes below are the ones contexts/design-patterns.md documents as deliberately
+// Generates the XML report scripts/manage.py's coverage command and Condor's coverage gate read
+// (app/build/reports/kover/reportMerged.xml: the `merged` variant holds :app's debug classes and :core's).
+// The threshold (issue #23) is measured against testable code only: the excluded classes below are the ones contexts/design-patterns.md documents as deliberately
 // manual (VpnService.Builder, real PackageManager/socket/HTTP glue, Compose UI) or trivial
 // wiring (DI container, ViewModel factories, the Application class) -- none of it is meant to
 // be unit-tested, so it should not silently drag the gate down. manage.py's own Python-side 80%
@@ -94,8 +91,14 @@ dependencies {
     kover(project(":core"))
 }
 
-koverReport {
-    androidReports("debug") {
+kover {
+    currentProject {
+        createVariant("merged") {
+            add("debug")
+            addWithDependencies("jvm", optional = true)
+        }
+    }
+    reports {
         filters {
             excludes {
                 classes(
@@ -138,5 +141,11 @@ koverReport {
                 minBound(90)
             }
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }

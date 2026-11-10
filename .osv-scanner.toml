@@ -1,116 +1,63 @@
 # OSV Scanner configuration
-# Build tool dependencies pulled in by Android Gradle Plugin (AGP) are excluded
-# because they are never shipped in the APK and only affect the build environment.
-# Copied from the sibling project Raven, which hit the same AGP-internal build-tool
-# dependencies (same AGP/Gradle version family) — same overrides apply here.
+# Each entry below names a package the scanner flags in gradle/verification-metadata.xml, scoped to the exact version.
+# All of them are build tooling (the Gradle build classpath, and the Android lint tool for some): none is on a debug or
+# release runtime or compile classpath of the APK, nor on :core's. Checked with
+# ./gradlew buildEnvironment :app:dependencies :core:dependencies :app-instrumented:dependencies on 2026-11-10 (AGP 9.5.1).
+# To see what the scanner flags, run it with no config. Drop an entry when its package leaves the metadata or stops
+# being flagged; look at all of them again on 2026-12-05 and whenever the AGP or Kover is updated.
 
 [[PackageOverrides]]
-name = "com.google.protobuf:protobuf-java"
+name = "com.google.guava:guava"
+version = "33.4.0-jre"
 ecosystem = "Maven"
 ignore = true
-reason = "AGP build tool dependency, not shipped in APK"
-
-[[PackageOverrides]]
-name = "commons-io:commons-io"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP build tool dependency, not shipped in APK"
-
-[[PackageOverrides]]
-name = "io.netty:netty-codec"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP internal networking stack (build daemon), not shipped in APK"
-
-[[PackageOverrides]]
-name = "io.netty:netty-codec-http"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP internal networking stack (build daemon), not shipped in APK"
-
-[[PackageOverrides]]
-name = "io.netty:netty-codec-http2"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP internal networking stack (build daemon), not shipped in APK"
-
-[[PackageOverrides]]
-name = "io.netty:netty-common"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP internal networking stack (build daemon), not shipped in APK"
-
-[[PackageOverrides]]
-name = "io.netty:netty-handler"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP internal networking stack (build daemon), not shipped in APK"
-
-[[PackageOverrides]]
-name = "io.netty:netty-handler-proxy"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP internal networking stack (build daemon), not shipped in APK"
+reason = "AGP build classpath and Android lint tool. GHSA-xxph-c9ww-hj94 (High): deserializing CompactHashMap, CompactHashSet or MapMakerInternalMap allocates memory without limit; the build deserializes nothing from outside. Fixed in 33.7.2. Look again on 2026-12-05."
 
 [[PackageOverrides]]
 name = "org.apache.commons:commons-lang3"
+version = "3.16.0"
 ecosystem = "Maven"
 ignore = true
-reason = "AGP build tool dependency, not shipped in APK"
-
-[[PackageOverrides]]
-name = "org.apache.commons:commons-compress"
-version = "1.21"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP build tool dependency, not shipped in APK"
+reason = "AGP build classpath and Android lint tool. GHSA-j288-q9x7-2f5v (Medium): uncontrolled recursion on very long inputs; the tools only read the project's own files. Fixed in 3.18.0. Look again on 2026-12-05."
 
 [[PackageOverrides]]
 name = "org.apache.httpcomponents:httpclient"
 version = "4.5.6"
 ecosystem = "Maven"
 ignore = true
-reason = "AGP build tool dependency, not shipped in APK"
+reason = "AGP build classpath and Android lint tool. GHSA-7r82-7xv7-xcpj (Medium): cross-site scripting in an HTML page HttpClient renders; the tools render none. Fixed in 4.5.13. Look again on 2026-12-05."
 
 [[PackageOverrides]]
 name = "org.bitbucket.b_c:jose4j"
+version = "0.9.5"
 ecosystem = "Maven"
 ignore = true
-reason = "AGP/Gradle daemon JWT library, not shipped in APK"
+reason = "AGP build classpath (signing). GHSA-3677-xxcr-wjqv (High): DoS through compressed JWE content; the build parses no JWE from outside. Fixed in 0.9.6. Look again on 2026-12-05."
 
 [[PackageOverrides]]
 name = "org.bouncycastle:bcpkix-jdk18on"
+version = "1.80.2"
 ecosystem = "Maven"
 ignore = true
-reason = "AGP/Gradle daemon SSL/TLS library, not shipped in APK"
+reason = "AGP build classpath and Android lint tool. GHSA-wg6q-6289-32hp (Medium): a broken or risky cryptographic algorithm in the bcpkix modules; used for APK signing in the build only. Fixed in 1.84. Look again on 2026-12-05."
 
 [[PackageOverrides]]
 name = "org.bouncycastle:bcprov-jdk18on"
+version = "1.80.2"
 ecosystem = "Maven"
 ignore = true
-reason = "AGP/Gradle daemon cryptography library, not shipped in APK"
+reason = "AGP build classpath and Android lint tool. GHSA-9pwp-9qqc-pr26 (Critical, name-constraints bypass in certificate validation) and GHSA-qp49-qgx5-5m26 (High, lazy ASN.1 parsing resets the nesting guard); the build validates and parses only its own signing material. Fixed in 1.85. Look again on 2026-12-05."
 
 [[PackageOverrides]]
 name = "org.freemarker:freemarker"
+version = "2.3.32"
 ecosystem = "Maven"
 ignore = true
-reason = "AGP/Gradle daemon templating library, not shipped in APK"
+reason = "Kover 0.9.11's coverage reporter (intellij-coverage-reporter) on the build classpath. GHSA-27j2-h3m2-8237 (Critical): path traversal in template loading, which needs an attacker-supplied template path; only the tool's bundled templates are loaded. Fixed in 2.3.35. Look again on 2026-12-05."
 
 [[PackageOverrides]]
 name = "org.jdom:jdom2"
+version = "2.0.6"
 ecosystem = "Maven"
 ignore = true
-reason = "AGP/Gradle XML parsing library, not shipped in APK"
-
-[[PackageOverrides]]
-name = "org.jetbrains.kotlin:kotlin-gradle-plugin"
-ecosystem = "Maven"
-ignore = true
-reason = "Build-tool dependency, not shipped in APK. GHSA-r937-wjx7-w2jp (CVE-2026-53914, Medium, local-attack-vector-only build-cache deserialization) has no stable fix yet - fix version 2.4.20-Beta1 is a pre-release. Revisit once Kotlin ships a stable 2.4.20+ release."
-
-[[PackageOverrides]]
-name = "com.google.guava:guava"
-version = "32.0.1-jre"
-ecosystem = "Maven"
-ignore = true
-reason = "AGP 8.6.0 build tool dependency (the build classpath and the Unified Test Platform host tools), not shipped in the APK or on the :core classpath; checked with ./gradlew buildEnvironment :app:dependencies :core:dependencies :app-instrumented:dependencies on 2026-11-10. GHSA-xxph-c9ww-hj94 (High) is a memory exhaustion when deserializing attacker-controlled streams, which neither the build nor the tests do. Fixed in 33.7.2: look again on 2026-12-05, or when the AGP is updated, and drop this entry."
+reason = "AGP build classpath (XML processing). GHSA-2363-cqg2-863c (High): XML external entity injection in JDOM; the build reads only the project's own XML. Fixed in 2.0.6.1. Look again on 2026-12-05."

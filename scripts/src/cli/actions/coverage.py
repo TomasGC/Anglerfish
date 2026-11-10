@@ -24,9 +24,9 @@ class CoverageAction:
         self._gradle = gradle or GradleRunner(runner, self._project_root)
 
     def run(self) -> int:
-        if not self._gradle.run_task("koverXmlReportDebug"):
+        if not self._gradle.run_task("koverXmlReportMerged"):
             return 1
-        report = self._project_root / "app" / "build" / "reports" / "kover" / "reportDebug.xml"
+        report = self._project_root / "app" / "build" / "reports" / "kover" / "reportMerged.xml"
         if not report.exists():
             log(f"ERROR: coverage report not found at {report}")
             return 1

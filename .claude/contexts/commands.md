@@ -52,7 +52,7 @@ same as Raven's own copy.
 ./gradlew detekt              # static analysis — config/detekt/detekt.yml, see design-patterns.md
                                # for the Composable-aware overrides
 ./gradlew lintDebug           # Android Lint
-./gradlew koverXmlReportDebug # app/build/reports/kover/reportDebug.xml
+./gradlew koverXmlReportMerged # app/build/reports/kover/reportMerged.xml (:app and :core)
 ```
 
 ---
@@ -67,15 +67,16 @@ same as Raven's own copy.
   `python-pipeline` (skipped when nothing under `scripts/` changed).
 - `pr-ci.yml` — runs on the pull request itself (opened, reopened, synchronize, edited): title format, secret
   scan and the context check. `code-paths` and `test-paths` cover `:app`, `:core` and `:app-instrumented`.
-- `.osv-scanner.toml` — overrides for AGP/Gradle-internal build-tool transitive dependencies
-  (netty, bouncycastle, commons-*, jose4j, freemarker, jdom2, the Kotlin Gradle plugin itself, and Guava
-  32.0.1-jre scoped to that version, re-check 2026-12-05) —
-  never shipped in the APK, so their CVEs don't apply to this app. Copied from Raven, which hits
-  the identical set (same AGP/Gradle version family).
-- `gradle/verification-metadata.xml` — regenerate with
-  `./gradlew --write-verification-metadata sha256 --refresh-dependencies --no-daemon clean assembleDebug testDebugUnitTest detekt lintDebug koverXmlReportDebug`
-  if CI starts failing with "Dependency verification failed" for a new artifact. Run once per
-  platform if the failure is for a platform-specific artifact (e.g. `aapt2`) — see
+- `.osv-scanner.toml` — eight entries, each scoped to the exact version and naming its source: build tooling (the
+  Gradle build classpath, and the Android lint tool for some) that the scanner flags in the metadata and that is
+  never on the APK's classpath. To see what the scanner flags, run it with no config; drop an entry when its package
+  leaves the metadata or stops being flagged (the header of the file says so). Re-check 2026-12-05.
+- `gradle/verification-metadata.xml` — after a dependency change, empty its `<components>` (the scan reads this
+  file, so stale versions would keep being flagged), rebuild the Windows entries with `./gradlew
+  --write-verification-metadata sha256 --refresh-dependencies clean assembleDebug :app:testDebugUnitTest :core:test
+  :core:integrationMock :core:integrationReal detekt lintDebug koverXmlReportMerged koverHtmlReportMerged
+  pixel4api30Setup`, then add the Linux entries (`aapt2` has separate jars) with a throwaway push-triggered Actions
+  job (KVM enabled, same command, uploads the file) on a branch that is not `feature/**`. See
   `contexts/design-patterns.md`'s "Cross-Platform Gradle Dependency-Verification Regeneration".
 
 ---
